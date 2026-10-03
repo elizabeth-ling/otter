@@ -13,7 +13,7 @@ Common workflow for every feature/fix:
 1. **Document** - Capture the feature in @context/current-feature.md
 2. **Branch** - Create a branch named `feature/[name]` or `fix/[name]`
 3. **Implement** - Build it per @context/current-feature.md
-4. **Test** - Verify in the browser and run `npm run build`; fix any errors (unit tests later)
+4. **Test** - Run `swift test` in `Packages/OtterCore` and `xcodebuild -scheme Otter build`; fix any errors. UI behavior is tested by hand in the running app
 5. **Iterate** - Adjust as needed
 6. **Commit** - Only after the build passes and with permission (see Commits)
 7. **Merge** - Merge to main, then delete the branch (ask first)
@@ -21,7 +21,7 @@ Common workflow for every feature/fix:
 
 ## Commits
 
-- Never commit without permission or before the build passes
+- Never commit without permission or before the build and tests pass
 - Conventional messages (feat:, fix:, chore:, etc.), one feature/fix per commit
 - Never put "Generated With Claude" in commit messages
 
@@ -40,7 +40,7 @@ Common workflow for every feature/fix:
 
 Review AI-generated code periodically and on demand, especially for:
 
-- Security (auth checks, input validation)
-- Performance (unnecessary re-renders, N+1 queries)
+- Security (user content passed to `osascript` only as argv, file paths and names sanitized, no note contents in logs)
+- Performance (nothing slow on the hotkey → panel path or the main thread, no idle timers)
 - Logic errors (edge cases)
 - Patterns (matches existing codebase?)

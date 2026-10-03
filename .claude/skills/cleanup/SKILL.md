@@ -7,13 +7,13 @@ argument-hint: run|check
 Review the codebase for cleanup tasks:
 
 1. Make sure that the history in @context/current-feature.md is in order from oldest to newest
-2. Find unnecessary console.log statements in Otter/ and Packages/OtterCore/Sources/
+2. Find `print`/`debugPrint`/`dump` statements in Otter/ and Packages/OtterCore/Sources/ (logging goes through `os.Logger`), and any log line that interpolates note contents
 3. Find unused imports
 4. Check for stale TODO comments
 5. Find orphaned/unused files
 6. Check that context files match actual project state
-7. Make sure that .env.production values are up to date with the same values as .env except for database values. Make sure those are different
-8. Find `@ts-ignore` comments that might be stale
+7. Check that Packages/OtterCore/Sources/ does not import AppKit, SwiftUI, or Cocoa
+8. Find force unwraps, `try!`, and `as!` without a justifying comment, and `@unchecked Sendable` / `nonisolated(unsafe)` that might be stale
 
 **Mode: $ARGUMENTS**
 

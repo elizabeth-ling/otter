@@ -21,9 +21,9 @@ Execute research task: $ARGUMENTS
    - **Include**: Specific details to capture
    - **Sources**: What files/tools to use
 5. Execute the research using appropriate tools:
-   - Read files (Prisma schema, constants, components)
-   - Query database via Neon MCP if needed
+   - Read files (Swift sources, `context/docs/`, `context/tasks/`, test fixtures)
    - Search codebase for patterns
+   - Check Apple developer documentation or upstream docs (e.g. Obsidian config formats) if needed
 6. Write findings to the specified output location
 7. Summarize what was discovered
 
