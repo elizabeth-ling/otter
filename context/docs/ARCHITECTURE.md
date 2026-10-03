@@ -37,7 +37,7 @@ flowchart LR
 Otter/
 ├── Otter.xcodeproj
 ├── App/
-│   ├── JotApp.swift              # @main, NSApplicationDelegateAdaptor
+│   ├── OtterApp.swift            # @main, NSApplicationDelegateAdaptor
 │   ├── AppDelegate.swift         # wiring, lifecycle
 │   ├── Hotkeys/HotkeyService.swift
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
@@ -57,7 +57,8 @@ Otter/
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift
     │   ├── Destinations/Obsidian/ObsidianDestination.swift, VaultDiscovery.swift,
     │   │                         DailyNoteResolver.swift, MomentFormat.swift
-    │   └── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
+    │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
+    │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core
     └── Tests/OtterCoreTests/
 ```
 

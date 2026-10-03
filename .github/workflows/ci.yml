@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OtterCore must not import UI frameworks
+        run: '! grep -rE "import (AppKit|SwiftUI|Cocoa)" Packages/OtterCore/Sources'
+
+      - name: Test OtterCore
+        working-directory: Packages/OtterCore
+        run: swift test
+
+      - name: Build Otter
+        run: xcodebuild -scheme Otter -configuration Debug build CODE_SIGNING_ALLOWED=NO
