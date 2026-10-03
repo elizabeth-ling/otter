@@ -15,7 +15,7 @@ Prove the two promises with numbers before release: **it feels instant** and **i
 
 ### 1. Performance measurements
 
-Add/verify `os_signpost` intervals and record results in `docs/PERF.md` (release build, Apple silicon, current macOS):
+Add/verify `os_signpost` intervals and record results in `context/docs/PERF.md` (release build, Apple silicon, current macOS):
 
 | Interval | Budget | Result |
 |---|---|---|
@@ -49,7 +49,7 @@ A debug-only test hook (`--otter-soak N`) that submits N synthetic captures (ran
 | Lifecycle | Sleep/wake with pending outbox; logout/login; Sparkle update with pending outbox and an open draft |
 | Hotkeys | `⌘Space` with Spotlight enabled (falls back to `⌥Space`, reminder shown); Spotlight shortcut disabled while Otter is running (Otter picks up `⌘Space` without relaunch); Spotlight moved to `⌥Space` (no clash with fallback); `⌥Space` taken by another app; shortcut cleared; same key for both shortcuts (must be prevented) |
 
-Record pass/fail per row in `docs/TEST_MATRIX.md`; file issues for failures.
+Record pass/fail per row in `context/docs/TEST_MATRIX.md`; file issues for failures.
 
 ### 4. Privacy audit
 
@@ -59,7 +59,7 @@ Record pass/fail per row in `docs/TEST_MATRIX.md`; file issues for failures.
 
 ## Acceptance criteria
 
-- [ ] All budgets met or explicitly accepted with a note in `docs/PERF.md`.
+- [ ] All budgets met or explicitly accepted with a note in `context/docs/PERF.md`.
 - [ ] Soak test: 0 lost captures.
 - [ ] Test matrix fully executed; no open P0/P1 issues.
 - [ ] Privacy audit passes.

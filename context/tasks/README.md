@@ -61,4 +61,4 @@ Milestone · Depends on · Estimate
 
 Something like:
 
-> Read `docs/OVERVIEW.md`, `docs/ARCHITECTURE.md` and `docs/DECISIONS.md`, then implement `tasks/T06-folder-destination.md`. Follow the task's implementation notes and stay within its scope. Before finishing, check every acceptance criterion and list how each was verified.
+> Read `context/docs/OVERVIEW.md`, `context/docs/ARCHITECTURE.md` and `context/docs/DECISIONS.md`, then implement `context/tasks/T06-folder-destination.md`. Follow the task's implementation notes and stay within its scope. Before finishing, check every acceptance criterion and list how each was verified.

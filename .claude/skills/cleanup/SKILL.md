@@ -7,7 +7,7 @@ argument-hint: run|check
 Review the codebase for cleanup tasks:
 
 1. Make sure that the history in @context/current-feature.md is in order from oldest to newest
-2. Find unnecessary console.log statements in src/
+2. Find unnecessary console.log statements in Otter/ and Packages/OtterCore/Sources/
 3. Find unused imports
 4. Check for stale TODO comments
 5. Find orphaned/unused files

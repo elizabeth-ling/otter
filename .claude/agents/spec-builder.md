@@ -6,7 +6,7 @@ effort: xhigh
 ---
 
 You implement exactly one Barnacle feature spec, end to end. Barnacle is a personal
-macOS app (Swift + SwiftUI, SwiftData). Follow CLAUDE.md, context/project-overview.md,
+macOS app (Swift + SwiftUI, SwiftData). Follow CLAUDE.md, context/docs/OVERVIEW.md,
 and context/ai-interaction.md.
 
 ## Scope

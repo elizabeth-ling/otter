@@ -16,7 +16,7 @@ Execute research task: $ARGUMENTS
 2. Look for prompt file at `context/research/{$ARGUMENTS}.md`
 3. If not found, error: "Prompt file not found at context/research/{$ARGUMENTS}.md"
 4. Read the prompt file which should contain:
-   - **Output**: Where to write results (e.g., `context/content-types.md`)
+   - **Output**: Where to write results (e.g., `context/docs/content-types.md`)
    - **Research**: What to investigate
    - **Include**: Specific details to capture
    - **Sources**: What files/tools to use
@@ -34,5 +34,5 @@ Execute research task: $ARGUMENTS
 - This command produces DOCUMENTATION only
 - Do NOT modify source code files
 - Do NOT create branches or commits
-- Output should go to `/docs/` unless otherwise specified
+- Output should go to `context/docs/` unless otherwise specified
 - Use subagents for thorough exploration if needed
