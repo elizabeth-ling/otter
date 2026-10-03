@@ -22,7 +22,7 @@ Replace the temporary menu items with a real Settings window, and get a new user
    - Deleting a destination with pending outbox items prompts to re-route them to the default.
 4. **Advanced**: outbox status + Retry now + Reveal outbox; recents on/off + Clear; Reveal logs; Reset all settings (confirmation).
 5. Panel footer destination pill becomes a real menu (click) listing destinations with `⌘` numbers.
-6. **First run** (when no `hasOnboarded` flag): opens Settings in an onboarding mode with the 3 steps from UX_SPEC §6. Step 1 is the `⌘Space` handoff: show Spotlight's status from `SpotlightShortcutProbe` (T02), the **Open Keyboard Shortcuts** button, re-check on app activation, then a "press ⌘Space now" confirmation that completes when the hotkey fires. Step 3 listens to `DeliveryService` and completes on the first successful delivery, showing an **Open** button for the note.
+6. **First run** (when no `hasOnboarded` flag): opens Settings in an onboarding mode with the 3 steps from UX_SPEC §6. Step 1 shows the `⌥Space` default with a "press it now" confirmation, plus "Use ⌘Space instead", which runs the handoff (ADR-011): show Spotlight's status from `SpotlightShortcutProbe` (T02), the **Open Keyboard Shortcuts** button, re-check on app activation, then a "press ⌘Space now" confirmation that completes when the hotkey fires. Step 3 listens to `DeliveryService` and completes on the first successful delivery, showing an **Open** button for the note.
 7. Remove the temporary menu items from T02/T06/T07/T08.
 
 ## Implementation notes
@@ -38,8 +38,9 @@ Replace the temporary menu items with a real Settings window, and get a new user
 - [ ] Every setting persists across relaunch and applies without restart.
 - [ ] Test button surfaces each error state with a working fix action (folder missing, Notes permission denied).
 - [ ] `⌘1…⌘9` in the panel matches the order shown in Settings.
-- [ ] On a Mac with Spotlight's default shortcut, onboarding step 1 gets the user to a working `⌘Space` in under 30 s, and "Skip for now" leaves `⌥Space` working.
-- [ ] Settings › General shows the effective hotkey and, while Spotlight still owns `⌘Space`, a "Finish setting up ⌘Space" row.
+- [ ] On a fresh Mac, `⌥Space` works at step 1 with no System Settings visit.
+- [ ] On a Mac with Spotlight's default shortcut, choosing `⌘Space` in step 1 gets the user to a working `⌘Space` in under 30 s, and "Skip for now" leaves `⌥Space` working.
+- [ ] Settings › General shows the effective hotkey and, while Spotlight still owns `⌘Space`, a "Finish setting up ⌘Space" row (only if the user chose `⌘Space`).
 - [ ] Full keyboard navigation and VoiceOver labels in Settings.
 
 ## Out of scope

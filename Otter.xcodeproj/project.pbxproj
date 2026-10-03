@@ -20,7 +20,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				HUD/.gitkeep,
-				Hotkeys/.gitkeep,
 				Onboarding/.gitkeep,
 				Panel/.gitkeep,
 				Resources/Info.plist,

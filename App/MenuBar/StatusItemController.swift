@@ -5,8 +5,10 @@ import AppKit
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
+    private let hotkeyWindowController: HotkeyWindowController
 
-    init() {
+    init(hotkeyWindowController: HotkeyWindowController) {
+        self.hotkeyWindowController = hotkeyWindowController
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         let image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: "Otter")
@@ -14,6 +16,10 @@ final class StatusItemController {
         statusItem.button?.image = image
 
         let menu = NSMenu()
+        // Temporary until Settings lands (T10).
+        let hotkeyItem = menu.addItem(withTitle: "Hotkey…", action: #selector(NSWindowController.showWindow(_:)), keyEquivalent: "")
+        hotkeyItem.target = hotkeyWindowController
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
     }

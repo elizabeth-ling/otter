@@ -98,7 +98,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-010 · `⌘Space` is the primary hotkey, with a guided Spotlight handoff (supersedes ADR-006)
+## ADR-010 · `⌘Space` is the primary hotkey, with a guided Spotlight handoff (supersedes ADR-006) — **Default changed by ADR-011**
 
 **Context.** The product owner wants `⌘Space`, the most reachable chord on a Mac. macOS reserves it for Spotlight, and while Spotlight's shortcut is enabled the system intercepts the keypress before any app hotkey sees it. Apps such as Raycast and Alfred solve this by asking the user to turn off or move Spotlight's shortcut during setup.
 
@@ -109,3 +109,16 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - Otter **never** edits `com.apple.symbolichotkeys` itself. Writing another system preference domain is fragile, only takes effect after logout, and is the kind of thing users rightly distrust.
 
 **Consequences.** One extra step in onboarding for users who pick `⌘Space`. Users who rely on Spotlight keep it on another shortcut. The symbolic-hotkey key number and plist shape are undocumented, so the check is best-effort: if it can't be read, Otter attempts registration and asks the user to press the shortcut once to confirm it works.
+
+---
+
+## ADR-011 · `⌥Space` is the default hotkey; `⌘Space` is opt-in (amends ADR-010)
+
+**Context.** ADR-010 made `⌘Space` the first choice. Because Spotlight owns `⌘Space` on a fresh Mac, that meant every new user started on a fallback, with a "finish setup" reminder and a System Settings detour before the recommended shortcut worked.
+
+**Decision.**
+- The toggle-panel shortcut defaults to `⌥Space`, and onboarding step 1 recommends it. It works on first launch with no handoff.
+- `⌘Space` stays one click away ("Use ⌘Space"). Picking it keeps ADR-010's handoff unchanged: probe Spotlight, fall back to `⌥Space` while Spotlight holds `⌘Space`, show the "Finish setting up ⌘Space" row, and never write `com.apple.symbolichotkeys`.
+- The save-clipboard shortcut still ships unset (suggest `⌥⇧Space`).
+
+**Consequences.** Most users never see the Spotlight step. `⌥Space` may already be taken by ChatGPT or Raycast, so onboarding's press-to-confirm check and recorder matter more (ADR-006's concern). macOS 15.0–15.1 reject hotkeys whose only modifier is `⌥`, and KeyboardShortcuts swallows that error, so the default may silently fail there; T14 should check it.

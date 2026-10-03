@@ -39,7 +39,8 @@ Otter/
 ├── App/
 │   ├── OtterApp.swift            # @main, NSApplicationDelegateAdaptor
 │   ├── AppDelegate.swift         # wiring, lifecycle
-│   ├── Hotkeys/HotkeyService.swift
+│   ├── Hotkeys/HotkeyService.swift, SpotlightShortcutProbe.swift
+│   │          HotkeyWindowController.swift   # temporary recorder window until T10
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
@@ -58,7 +59,10 @@ Otter/
     │   ├── Destinations/Obsidian/ObsidianDestination.swift, VaultDiscovery.swift,
     │   │                         DailyNoteResolver.swift, MomentFormat.swift
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
+    │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
+    │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
     │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core
+    │               Signposts.swift   # os_signpost intervals (§9)
     └── Tests/OtterCoreTests/
 ```
 

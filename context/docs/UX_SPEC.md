@@ -60,7 +60,7 @@ The `●` on the left is the destination dot (colored per destination). The foot
 
 | Shortcut | Scope | Action |
 |---|---|---|
-| `⌘Space` *(recommended, set up in onboarding; `⌥Space` until Spotlight's shortcut is moved — see ADR-010)* | Global | Toggle panel (show → focus → hide) |
+| `⌥Space` *(default; `⌘Space` optional, set up in onboarding — see ADR-010, ADR-011)* | Global | Toggle panel (show → focus → hide) |
 | *unset (suggest `⌥⇧Space`)* | Global | Save clipboard as a note instantly, show HUD |
 | `⌘↩` | Panel | Save and close |
 | `⇧⌘↩` | Panel | Save and keep open (cleared, ready for the next note) |
@@ -91,8 +91,8 @@ Error variant: "✕ Clipboard is empty" / "✕ Skipped — clipboard came from a
 Template icon (monochrome, adapts to light/dark). Amber dot when deliveries are failing.
 
 ```
-New Note                          ⌘Space
-Finish setting up ⌘Space…                   (only while Spotlight still owns it)
+New Note                          ⌥Space
+Finish setting up ⌘Space…                   (only if the user chose ⌘Space and Spotlight still owns it)
 Save Clipboard                    ⌥⇧Space
 ──────────────────────────────────────────
 Recent                                  ▸   (last 10: first line · destination · time)
@@ -128,9 +128,9 @@ Clicking a recent item opens it where it lives: reveal in Finder (Folder), `obsi
 
 Shown once, in the Settings window, three steps:
 
-1. **Your hotkey.** Recommended: `⌘Space`. If Spotlight still owns it, the step explains this in one sentence and shows an **Open Keyboard Shortcuts** button (System Settings › Keyboard › Keyboard Shortcuts › Spotlight) with "Uncheck *Show Spotlight search*, or change it to ⌥Space." The step re-checks when Otter regains focus and turns green once `⌘Space` is free; then it asks the user to press `⌘Space` once to confirm. "Use a different shortcut" opens the recorder; "Skip for now" keeps `⌥Space`.
+1. **Your hotkey.** Recommended: `⌥Space`, already active. "Use ⌘Space instead" starts the Spotlight handoff: if Spotlight still owns `⌘Space`, the step explains this in one sentence and shows an **Open Keyboard Shortcuts** button (System Settings › Keyboard › Keyboard Shortcuts › Spotlight) with "Uncheck *Show Spotlight search*, or change it to ⌥Space." The step re-checks when Otter regains focus and turns green once `⌘Space` is free; then it asks the user to press `⌘Space` once to confirm. "Use a different shortcut" opens the recorder; "Skip for now" keeps `⌥Space`. Either way, the step asks the user to press the shortcut once to confirm it reaches Otter (`⌥Space` may be taken by another app).
 2. **Where should notes go?** Detected Obsidian vaults listed first, then Apple Notes, then "A folder…". One choice; sensible defaults for the rest (Obsidian → daily note append; Notes → "Otter" folder in the default account; Folder → new file per note). Picking Apple Notes immediately runs a test so the Automation prompt appears now, not mid-capture.
-3. **Try it.** "Press ⌘Space, type anything, hit ⌘↩." (shows whichever hotkey step 1 ended on) The step completes itself when the first capture is delivered and shows where it went, with an "Open" button.
+3. **Try it.** "Press ⌥Space, type anything, hit ⌘↩." (shows whichever hotkey step 1 ended on) The step completes itself when the first capture is delivered and shows where it went, with an "Open" button.
 
 Launch at login is offered on the last step (default on).
 

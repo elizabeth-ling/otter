@@ -34,7 +34,7 @@ These are the tie-breakers for every decision.
 ### In (v1)
 
 - Menu-bar agent app (no Dock icon), launches at login.
-- Global hotkey **`⌘Space`** (onboarding walks you through moving Spotlight off it; `⌥Space` until then; fully configurable) toggles a ChatGPT-overlay-style floating bar above any app, Space or full-screen window.
+- Global hotkey **`⌥Space`** (fully configurable; onboarding offers `⌘Space` and walks you through moving Spotlight off it) toggles a ChatGPT-overlay-style floating bar above any app, Space or full-screen window.
 - Plain-text editor with draft autosave; `⌘↩` to save and close; `Esc` to close and keep the draft.
 - Destinations:
   - **Folder** — new file per note, or append to a single inbox file.
@@ -98,8 +98,8 @@ Point a folder destination at your Obsidian vault after M0 and you're already do
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | Apple Notes scripting is slow or breaks in a macOS update | Medium | Async outbox hides latency; clear error + "Test connection"; Folder fallback always available |
-| `⌘Space` is owned by Spotlight until the user moves it | Certain | Guided handoff in onboarding (ADR-010), `⌥Space` fallback, persistent "finish setup" reminder |
-| Fallback `⌥Space` already taken by ChatGPT/Raycast | Medium | Configurable; press-to-confirm check in onboarding |
+| `⌘Space` (opt-in) is owned by Spotlight until the user moves it | Certain | `⌥Space` default (ADR-011); guided handoff in onboarding (ADR-010), `⌥Space` fallback, persistent "finish setup" reminder |
+| Default `⌥Space` already taken by ChatGPT/Raycast | Medium | Configurable; press-to-confirm check in onboarding |
 | Obsidian config formats change (daily notes, Periodic Notes plugin) | Medium | Parse defensively; fall back to defaults; let the user override folder/format manually |
 | Non-activating panel focus edge cases (full-screen, Stage Manager, IME) | Medium | Dedicated test matrix in T14 |
 | iCloud Drive vault not downloaded / offline | Low | Coordinated writes; outbox retries; surface the error |

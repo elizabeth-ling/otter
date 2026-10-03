@@ -6,7 +6,7 @@ Each task is sized to be one focused PR (roughly half a day to a day and a half)
 
 | Milestone | Done when | Tasks |
 |---|---|---|
-| **M0 — Walking skeleton** | You can press the hotkey (`⌘Space`, or `⌥Space` while Spotlight still owns it) anywhere, type, hit `⌘↩`, and the note lands in a folder you chose. Point it at your Obsidian vault and start dogfooding. | T01 → T02 → T03 → T04 → T05 → T06 |
+| **M0 — Walking skeleton** | You can press the hotkey (`⌥Space` by default, or `⌘Space` once Spotlight is moved off it) anywhere, type, hit `⌘↩`, and the note lands in a folder you chose. Point it at your Obsidian vault and start dogfooding. | T01 → T02 → T03 → T04 → T05 → T06 |
 | **M1 — Integrations** | Obsidian daily-note append, Apple Notes, pasted images, save-clipboard hotkey | T07, T08, T09, T11 |
 | **M2 — Ship it** | A stranger can download a notarized DMG, onboard in under a minute, and auto-update | T10, T12, T13, T14 |
 

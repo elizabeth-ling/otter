@@ -4,12 +4,12 @@
 
 ## Goal
 
-`⌘Space` opens the panel from any app, Space or full-screen window, with no Accessibility permission. Because Spotlight owns `⌘Space` by default, the service detects that, falls back to `⌥Space`, and switches to `⌘Space` by itself as soon as the user frees it.
+`⌥Space` (the default, ADR-011) opens the panel from any app, Space or full-screen window, with no Accessibility permission. Users can opt into `⌘Space`; because Spotlight owns `⌘Space` by default, the service detects that, falls back to `⌥Space`, and switches to `⌘Space` by itself as soon as the user frees it.
 
 ## Read first
 
 - UX_SPEC §2 (keyboard map), §6 step 1 (onboarding hotkey step)
-- DECISIONS ADR-010 (supersedes ADR-006)
+- DECISIONS ADR-010 (supersedes ADR-006), amended by ADR-011 (`⌥Space` default)
 - ARCHITECTURE §7 (permissions)
 
 ## Scope
@@ -17,7 +17,7 @@
 1. `HotkeyService` wrapping `KeyboardShortcuts`:
    ```swift
    extension KeyboardShortcuts.Name {
-       static let togglePanel   = Self("togglePanel", default: .init(.space, modifiers: [.command]))
+       static let togglePanel   = Self("togglePanel", default: .init(.space, modifiers: [.option]))
        static let saveClipboard = Self("saveClipboard")   // no default
    }
    static let fallbackToggle = KeyboardShortcuts.Shortcut(.space, modifiers: [.option])
@@ -61,7 +61,7 @@
 - [ ] Clearing the shortcut disables it.
 - [ ] No permission prompt appears at any point.
 - [ ] Recording `⌃Space` shows a warning; recording the same shortcut for both actions is refused.
-- [ ] Otter never writes to `com.apple.symbolichotkeys` (grep the codebase).
+- [x] Otter never writes to `com.apple.symbolichotkeys` (grep the codebase).
 
 ## Out of scope
 
