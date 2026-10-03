@@ -53,10 +53,11 @@
 
 ## Acceptance criteria
 
-- [ ] With Spotlight's shortcut turned off, `⌘Space` opens the panel from Safari, Terminal, a full-screen app, and the desktop.
-- [ ] With Spotlight's shortcut on (fresh macOS default), `⌥Space` works and `needsSpotlightHandoff` is `true`; `⌘Space` still opens Spotlight.
-- [ ] Unchecking "Show Spotlight search" in System Settings, then switching back to any app, makes `⌘Space` open Otter with no relaunch, and `⌥Space` stops working.
-- [ ] Re-enabling Spotlight's shortcut flips Otter back to the fallback on next probe.
+- [ ] On a fresh install (default shortcut), `⌥Space` opens the panel from Safari, Terminal, a full-screen app, and the desktop; `needsSpotlightHandoff` is `false` and `⌘Space` still opens Spotlight.
+- [ ] After opting into `⌘Space` with Spotlight's shortcut turned off, `⌘Space` opens the panel from Safari, Terminal, a full-screen app, and the desktop, and `⌥Space` does nothing.
+- [ ] After opting into `⌘Space` with Spotlight's shortcut on (fresh macOS default), `⌥Space` works as the fallback and `needsSpotlightHandoff` is `true`; `⌘Space` still opens Spotlight.
+- [ ] With `⌘Space` chosen, unchecking "Show Spotlight search" in System Settings, then switching back to any app, makes `⌘Space` open Otter with no relaunch, and `⌥Space` stops working.
+- [ ] Re-enabling Spotlight's shortcut flips Otter back to the `⌥Space` fallback on next probe.
 - [ ] Changing the shortcut in the recorder takes effect immediately and persists across relaunch.
 - [ ] Clearing the shortcut disables it.
 - [ ] No permission prompt appears at any point.
