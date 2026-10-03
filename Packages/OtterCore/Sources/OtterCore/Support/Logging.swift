@@ -1,3 +1,4 @@
+import Foundation
 import os
 
 /// One logger per ARCHITECTURE §10 category. Never log note contents —
@@ -11,4 +12,13 @@ public extension Logger {
     static let folder = Logger(subsystem: subsystem, category: "folder")
     static let obsidian = Logger(subsystem: subsystem, category: "obsidian")
     static let notes = Logger(subsystem: subsystem, category: "notes")
+}
+
+public extension Error {
+    /// Domain and code only, e.g. `NSCocoaErrorDomain 640`. Safe to log publicly: an error's
+    /// description can contain a file name taken from the note's first line.
+    var loggableCode: String {
+        let error = self as NSError
+        return "\(error.domain) \(error.code)"
+    }
 }

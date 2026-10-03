@@ -45,6 +45,7 @@ Otter/
 │   ├── Panel/PanelController.swift
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
 │   ├── Panel/AttachmentChips.swift
+│   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
 │   ├── MenuBar/StatusItemController.swift
 │   ├── Settings/…                # SwiftUI views
@@ -53,8 +54,9 @@ Otter/
 └── Packages/OtterCore/
     ├── Sources/OtterCore/
     │   ├── Model/Capture.swift, Attachment.swift, DestinationConfig.swift
-    │   ├── Pipeline/Outbox.swift, DeliveryService.swift, RecentStore.swift, DraftStore.swift
-    │   ├── Destinations/Destination.swift
+    │   ├── Pipeline/Outbox.swift, DeliveryService.swift, DeliveryClock.swift, RecentStore.swift, DraftStore.swift,
+    │   │            CaptureFailure.swift, StorageLocations.swift
+    │   ├── Destinations/Destination.swift, DestinationRegistry.swift
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift
     │   ├── Destinations/Obsidian/ObsidianDestination.swift, VaultDiscovery.swift,
     │   │                         DailyNoteResolver.swift, MomentFormat.swift
@@ -71,7 +73,8 @@ Otter/
 ```swift
 public struct Capture: Codable, Identifiable, Sendable {
     public let id: UUID
-    public let createdAt: Date          // stored with the local TZ offset at capture time
+    public let createdAt: Date
+    public let timeZoneIdentifier: String // TimeZone.current at capture time; delivery formats createdAt in it
     public var text: String
     public var attachments: [Attachment]
     public var destinationID: DestinationID
@@ -100,7 +103,7 @@ public struct DeliveryReceipt: Codable, Sendable {
 }
 ```
 
-`DestinationConfig` is a Codable enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`) persisted in `UserDefaults` as JSON. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working.
+`DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working.
 
 ## 4. The capture pipeline
 
@@ -137,7 +140,7 @@ sequenceDiagram
 
 1. The panel hides only after the outbox write returns. That write is a small local file — single-digit milliseconds — so it never shows up as latency.
 2. Delivery is **at-least-once**. A duplicate can only occur if the process dies between the destination write and the outbox removal; that window is tiny and a duplicate is far better than a loss (ADR-005).
-3. `DeliveryService` is an actor with **one serial queue per destination**, so appends to the same file keep their order, and a slow Apple Notes call never blocks a folder write.
+3. `DeliveryService` is an actor with **one serial queue per destination**, so appends to the same file keep their order, and a slow Apple Notes call never blocks a folder write. A capture waiting on a retry holds back the later captures for its destination. Captures whose destination can't be built stay pending and are flagged in the service's status; there is no retry timer for them.
 4. On launch, on wake from sleep (`NSWorkspace.didWakeNotification`) and on any successful enqueue, the service drains pending items. There are no polling timers while the outbox is empty.
 5. After 5 consecutive failures for one destination: macOS notification + amber menu bar badge. Items are never auto-deleted.
 6. If a destination is deleted while items are pending for it, those items are offered for re-routing to the default destination.

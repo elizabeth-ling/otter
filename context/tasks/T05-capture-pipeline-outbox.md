@@ -42,10 +42,10 @@ All in OtterCore unless noted.
 
 ## Acceptance criteria
 
-- [ ] Unit test: enqueue → "crash" (drop actors) → new `Outbox` on the same dir → item pending → delivered.
-- [ ] Unit test: destination fails 3 times then succeeds → exactly one successful delivery, attempts = 4, backoff times correct (inject a clock).
-- [ ] Unit test: 100 captures to one destination are delivered in order; a slow destination doesn't delay another.
-- [ ] Enqueue p95 < 10 ms on an SSD (measured in a test with 1 KB notes).
+- [x] Unit test: enqueue → "crash" (drop actors) → new `Outbox` on the same dir → item pending → delivered.
+- [x] Unit test: destination fails 3 times then succeeds → exactly one successful delivery, attempts = 4, backoff times correct (inject a clock).
+- [x] Unit test: 100 captures to one destination are delivered in order; a slow destination doesn't delay another.
+- [x] Enqueue p95 < 10 ms on an SSD (measured in a test with 1 KB notes).
 - [ ] No CPU wakeups when the outbox is empty (verify with Activity Monitor "Idle Wake Ups").
 
 ## Out of scope
