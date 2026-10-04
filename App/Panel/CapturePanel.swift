@@ -1,6 +1,6 @@
 import AppKit
 
-/// The Spotlight-style floating panel (ARCHITECTURE §6). Non-activating, so showing it leaves the
+/// The floating sticky-note panel (ARCHITECTURE §6, ADR-012). Non-activating, so showing it leaves the
 /// frontmost app active and hiding it hands keyboard focus straight back. Created once by
 /// `PanelController` and only ordered in and out.
 final class CapturePanel: NSPanel {

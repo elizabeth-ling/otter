@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.start()
         hotkeyService = hotkeys
 
-        statusItemController = StatusItemController(hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys))
+        statusItemController = StatusItemController(
+            hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
+            panelController: panel
+        )
     }
 }

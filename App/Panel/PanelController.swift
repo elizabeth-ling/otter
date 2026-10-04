@@ -2,14 +2,13 @@ import AppKit
 import OtterCore
 import os
 
-/// Shows, hides and positions the capture panel (T03). The panel is built once here and only
+/// Shows, hides and positions the capture panel (T03, T15). The panel is built once here and only
 /// ordered in and out, so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
 ///
 /// Never calls `NSApp.activate`: the panel is non-activating, so the app the user came from stays
 /// active and gets keyboard focus back on hide.
 @MainActor
 final class PanelController: NSObject, NSWindowDelegate {
-    static let widthKey = "panelWidth"
     static let fadeDuration: TimeInterval = 0.08
 
     /// "Keep panel open when clicking elsewhere". Hard-coded until Settings (T10).
@@ -17,7 +16,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     private let panel: CapturePanel
     private let content = PanelContentView()
-    private let defaults: UserDefaults
+    private let frameStore: PanelFrameStore
     private let destinationName: @MainActor () -> String
 
     /// Fading out: still on screen but already counted as hidden.
@@ -26,20 +25,22 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var fadeGeneration = 0
     /// A `hotkey→visible` interval is open and ends when the panel becomes key.
     private var awaitingVisible = false
+    /// Otter is setting the frame itself, so `windowDidMove` mustn't save it as the user's position.
+    private var isPlacing = false
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
     init(defaults: UserDefaults = .standard, destinationName: @escaping @MainActor () -> String) {
-        self.defaults = defaults
+        frameStore = PanelFrameStore(defaults: defaults)
         self.destinationName = destinationName
-        panel = CapturePanel(contentRect: NSRect(x: 0, y: 0, width: PanelPlacement.defaultWidth, height: PanelContentView.barHeight))
+        panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
 
         panel.contentView = content
         panel.initialFirstResponder = content.editor
+        panel.minSize = PanelPlacement.minimumSize
         panel.delegate = self
         panel.onCancel = { [weak self] in self?.hide() }
-        content.onPreferredHeightChange = { [weak self] in self?.updateHeight() }
     }
 
     /// The toggle hotkey (T02 table).
@@ -68,8 +69,10 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         content.setDestinationName(destinationName())
         content.setReduceTransparency(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+        // Placed while still ordered out, so the move isn't mistaken for a drag. A press during the
+        // fade-out brings the panel back where it is.
         if !wasHiding {
-            setFrame(PanelPlacement.frame(width: savedWidth, height: content.preferredHeight, in: screenUnderPointer().visibleFrame))
+            place(on: screenUnderPointer())
         }
 
         let animate = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -98,6 +101,15 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Menu bar "Reset Panel Position" (T10 moves it to Settings › General): default size and
+    /// placement on every display from the next show.
+    @objc func resetPanelPosition(_ sender: Any?) {
+        frameStore.reset()
+        if isShown, let screen = panel.screen {
+            place(on: screen)
+        }
+    }
+
     // MARK: - NSWindowDelegate
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -116,17 +128,22 @@ final class PanelController: NSObject, NSWindowDelegate {
         hide()
     }
 
+    /// A drag of the header or footer. Live resizes from the top or left edge move the window too;
+    /// `windowDidEndLiveResize` saves those once at the end.
+    func windowDidMove(_ notification: Notification) {
+        guard !isPlacing, isShown, !panel.inLiveResize else {
+            return
+        }
+        savePosition()
+    }
+
     func windowDidEndLiveResize(_ notification: Notification) {
-        defaults.set(Double(panel.frame.width), forKey: Self.widthKey)
+        frameStore.saveSize(panel.frame.size)
+        savePosition()
         panel.invalidateShadow()
     }
 
     // MARK: - Private
-
-    private var savedWidth: CGFloat {
-        let width = defaults.double(forKey: Self.widthKey)
-        return width > 0 ? width : PanelPlacement.defaultWidth
-    }
 
     /// Begun here rather than on every key press, so presses that hide the panel leave no open interval.
     private func beginVisibleSignpost() {
@@ -148,24 +165,26 @@ final class PanelController: NSObject, NSWindowDelegate {
         return NSScreen.main ?? screens[0]
     }
 
-    /// Only the width is user-resizable; the height follows the content.
-    private func setFrame(_ frame: NSRect) {
-        panel.minSize = NSSize(width: PanelPlacement.minimumWidth, height: frame.height)
-        panel.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: frame.height)
+    /// The saved size, at this display's saved position or the default placement, clamped on-screen.
+    private func place(on screen: NSScreen) {
+        let visible = screen.visibleFrame
+        let size = frameStore.size ?? PanelPlacement.defaultSize
+        let offset = screen.displayUUID.flatMap { frameStore.offset(forDisplay: $0) }
+        let frame = PanelPlacement.frame(size: size, offset: offset, in: visible)
+
+        panel.maxSize = PanelPlacement.clampedSize(PanelPlacement.maximumSize, in: visible)
+        isPlacing = true
         panel.setFrame(frame, display: true)
+        isPlacing = false
         panel.invalidateShadow()
     }
 
-    /// Grows or shrinks downward, keeping the top edge where it is.
-    private func updateHeight() {
-        var frame = panel.frame
-        let height = content.preferredHeight
-        frame.origin.y += frame.height - height
-        frame.size.height = height
-        if let visible = panel.screen?.visibleFrame, frame.minY < visible.minY {
-            frame.origin.y = visible.minY
+    /// Saved against the display holding most of the panel, as an offset from its visible frame.
+    private func savePosition() {
+        guard let screen = panel.screen, let uuid = screen.displayUUID else {
+            return
         }
-        setFrame(frame)
+        frameStore.saveOffset(PanelPlacement.offset(of: panel.frame, in: screen.visibleFrame), forDisplay: uuid)
     }
 
     private func fade(to alpha: CGFloat, animate: Bool, completion: (@MainActor () -> Void)?) {
@@ -182,5 +201,17 @@ final class PanelController: NSObject, NSWindowDelegate {
                 completion?()
             }
         }
+    }
+}
+
+private extension NSScreen {
+    /// Stable across reboots and reconnects, unlike `NSScreenNumber` (the `CGDirectDisplayID`).
+    var displayUUID: String? {
+        guard let number = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue()
+        else {
+            return nil
+        }
+        return CFUUIDCreateString(nil, uuid) as String
     }
 }

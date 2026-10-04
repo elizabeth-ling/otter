@@ -6,9 +6,11 @@ import AppKit
 final class StatusItemController {
     private let statusItem: NSStatusItem
     private let hotkeyWindowController: HotkeyWindowController
+    private let panelController: PanelController
 
-    init(hotkeyWindowController: HotkeyWindowController) {
+    init(hotkeyWindowController: HotkeyWindowController, panelController: PanelController) {
         self.hotkeyWindowController = hotkeyWindowController
+        self.panelController = panelController
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         let image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: "Otter")
@@ -19,6 +21,9 @@ final class StatusItemController {
         // Temporary until Settings lands (T10).
         let hotkeyItem = menu.addItem(withTitle: "Hotkey…", action: #selector(NSWindowController.showWindow(_:)), keyEquivalent: "")
         hotkeyItem.target = hotkeyWindowController
+        // Moves to Settings › General with T10.
+        let resetItem = menu.addItem(withTitle: "Reset Panel Position", action: #selector(PanelController.resetPanelPosition(_:)), keyEquivalent: "")
+        resetItem.target = panelController
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
