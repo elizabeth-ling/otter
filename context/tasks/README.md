@@ -7,7 +7,7 @@ Each task is sized to be one focused PR (roughly half a day to a day and a half)
 | Milestone | Done when | Tasks |
 |---|---|---|
 | **M0 — Walking skeleton** | You can press the hotkey (`⌥Space` by default, or `⌘Space` once Spotlight is moved off it) anywhere, type, hit `⌘↩`, and the note lands in a folder you chose. Point it at your Obsidian vault and start dogfooding. | T01 → T02 → T03 → T15 → T04 → T05 → T06 |
-| **M1 — Integrations** | Obsidian daily-note append, Apple Notes, pasted images, save-clipboard hotkey, `⌘S` save-as | T07, T08, T09, T11, T16 |
+| **M1 — Integrations** | Obsidian daily-note append, Apple Notes, pasted images, save-clipboard hotkey, `⌘S` save-as, change the save folder from the panel header | T07, T08, T09, T11, T16, T17 |
 | **M2 — Ship it** | A stranger can download a notarized DMG, onboard in under a minute, and auto-update | T10, T12, T13, T14 |
 
 ## Dependency graph
@@ -31,6 +31,9 @@ flowchart LR
   T02 --> T11
   T07 --> T10[T10 Settings + onboarding]
   T16 --> T10
+  T06 --> T17[T17 Change folder from panel]
+  T15 --> T17
+  T17 --> T10
   T08 --> T10
   T05 --> T12[T12 Menu bar + lifecycle]
   T10 --> T13[T13 Packaging]

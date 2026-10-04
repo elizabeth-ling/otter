@@ -63,7 +63,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 
 ### Footer
 
-- **Destination pill** (in the header): colored dot + destination name. Click or `⌘1…⌘9` switches destination for *this note only*. The default comes back on the next open.
+- **Destination pill** (in the header): colored dot + destination name. For a folder destination the name is the folder's name, its tooltip is the full path, and it highlights on hover. Clicking it (or `⇧⌘O`) opens a folder picker over the panel; the folder chosen becomes where notes are saved from then on, and the text being typed stays as it is (T17). `⌘1…⌘9` switches destination for *this note only*; the default comes back on the next open.
 - **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an inline warning when relevant, e.g. "Apple Notes can't take images yet — they'll be dropped."
 - **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the destination pill. Click → menu with Retry / Show details.
 
@@ -89,6 +89,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | `Esc` | Panel | Close. Draft is kept and restored next time |
 | `⇧⌘⌫` | Panel | Discard draft (and attachments) |
 | `⌘1` … `⌘9` | Panel | Choose destination for this note |
+| `⇧⌘O` | Panel | Change the save folder (same as clicking the folder name in the header) |
 | `⌘V` | Panel | Paste as plain text; images/files become attachments |
 | `⇧⌥⌘V` | Panel | Paste with original formatting converted to Markdown *(stretch)* |
 | `⌘,` | Panel | Open Settings |

@@ -47,7 +47,7 @@ Otter/
 │   ├── Panel/AttachmentChips.swift
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
-│   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10
+│   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10; also opened from the panel header (T17)
 │   ├── Settings/…                # SwiftUI views
 │   ├── Onboarding/…
 │   └── Resources/Info.plist, Assets.xcassets
