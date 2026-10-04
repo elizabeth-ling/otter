@@ -2,8 +2,9 @@ import AppKit
 import OtterCore
 import os
 
-/// Shows, hides and positions the capture panel (T03, T15). The panel is built once here and only
-/// ordered in and out, so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
+/// Shows, hides and positions the capture panel (T03, T15), and runs its editor: the keyboard map,
+/// submitting and the saved draft (T04). The panel is built once here and only ordered in and out,
+/// so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
 ///
 /// Never calls `NSApp.activate`: the panel is non-activating, so the app the user came from stays
 /// active and gets keyboard focus back on hide.
@@ -17,7 +18,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let panel: CapturePanel
     private let content = PanelContentView()
     private let frameStore: PanelFrameStore
+    private let draftStore: DraftStore
     private let destinationName: @MainActor () -> String
+    private let submitNote: @MainActor (_ text: String) async -> Bool
 
     /// Fading out: still on screen but already counted as hidden.
     private var isHiding = false
@@ -27,20 +30,39 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var awaitingVisible = false
     /// Otter is setting the frame itself, so `windowDidMove` mustn't save it as the user's position.
     private var isPlacing = false
+    /// The saved draft is put in the editor on the first show; after that the editor keeps its text.
+    private var didRestoreDraft = false
+    /// A note is on its way to the outbox; further submits wait for it.
+    private var isSubmitting = false
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
-    init(defaults: UserDefaults = .standard, destinationName: @escaping @MainActor () -> String) {
+    /// - Parameter submit: Puts the note in the outbox. Returns `true` once it's safe there.
+    init(
+        defaults: UserDefaults = .standard,
+        draftStore: DraftStore,
+        destinationName: @escaping @MainActor () -> String,
+        submit: @escaping @MainActor (_ text: String) async -> Bool
+    ) {
         frameStore = PanelFrameStore(defaults: defaults)
+        self.draftStore = draftStore
         self.destinationName = destinationName
+        submitNote = submit
         panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
 
         panel.contentView = content
-        panel.initialFirstResponder = content.editor
+        panel.initialFirstResponder = content.editor.textView
         panel.minSize = PanelPlacement.minimumSize
         panel.delegate = self
         panel.onCancel = { [weak self] in self?.hide() }
+        content.editor.onCommand = { [weak self] command in self?.perform(command) }
+        content.editor.onTextChange = { [weak self] in self?.saveDraft() }
+
+        // Read off the main thread now, so the first show finds it in memory.
+        DispatchQueue.global(qos: .utility).async {
+            _ = draftStore.load()
+        }
     }
 
     /// The toggle hotkey (T02 table).
@@ -68,6 +90,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         isHiding = false
 
         content.setDestinationName(destinationName())
+        if !didRestoreDraft {
+            didRestoreDraft = true
+            content.editor.setText(draftStore.load()?.text ?? "")
+        }
         content.setReduceTransparency(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
         // Placed while still ordered out, so the move isn't mistaken for a drag. A press during the
         // fade-out brings the panel back where it is.
@@ -91,6 +117,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         fadeGeneration += 1
         let generation = fadeGeneration
         isHiding = true
+        if didRestoreDraft {
+            draftStore.saveNow(currentDraft)
+        }
 
         fade(to: 0, animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak self] in
             guard let self, generation == fadeGeneration else {
@@ -108,6 +137,11 @@ final class PanelController: NSObject, NSWindowDelegate {
         if isShown, let screen = panel.screen {
             place(on: screen)
         }
+    }
+
+    /// Writes the draft to disk before the app quits.
+    func flushDraft() {
+        draftStore.flush()
     }
 
     // MARK: - NSWindowDelegate
@@ -152,8 +186,63 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private func focusEditor() {
-        panel.makeFirstResponder(content.editor)
-        content.moveCaretToEnd()
+        panel.makeFirstResponder(content.editor.textView)
+        content.editor.moveCaretToEnd()
+    }
+
+    private var currentDraft: Draft {
+        Draft(text: content.editor.text)
+    }
+
+    /// Every edit. Written once typing pauses.
+    private func saveDraft() {
+        draftStore.save(currentDraft)
+    }
+
+    private func perform(_ command: EditorCommand) {
+        switch command {
+        case let .submit(closeAfter):
+            submit(closeAfter: closeAfter)
+        case .discard:
+            // Undoable; the edit saves the now-empty draft. Attachments join in T09.
+            content.editor.discardText()
+        case let .selectDestination(index):
+            Logger.panel.info("Destination \(index + 1, privacy: .public) chosen; destinations are picked here from T10")
+        case .openSettings:
+            Logger.panel.info("Settings requested; they arrive with T10")
+        }
+    }
+
+    /// `⌘↩` and `⇧⌘↩`. The draft is cleared only once the outbox has the note; if it doesn't, the
+    /// panel stays open with the text.
+    private func submit(closeAfter: Bool) {
+        guard !isSubmitting else {
+            return
+        }
+        let text = content.editor.text
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            if closeAfter {
+                hide()
+            }
+            return
+        }
+
+        isSubmitting = true
+        Task {
+            let saved = await submitNote(text)
+            isSubmitting = false
+            guard saved else {
+                return
+            }
+            // Text typed while the note was being saved stays, rather than being lost with it.
+            if content.editor.text == text {
+                content.editor.clear()
+                draftStore.clear()
+            }
+            if closeAfter {
+                hide()
+            }
+        }
     }
 
     private func screenUnderPointer() -> NSScreen {

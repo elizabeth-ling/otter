@@ -6,7 +6,7 @@ import os
 /// (ARCHITECTURE §4, ADR-005). The panel hides only once the outbox has the note.
 @MainActor
 final class CaptureService {
-    /// The outbox has the note: clear the draft and hide the panel. The panel wires this (T03/T04).
+    /// The outbox has the note. The panel acts on `submit`'s result instead (T04).
     var onCaptured: (@MainActor () -> Void)?
     /// The note isn't saved (disk full, no destination…): keep the panel open and show `message` in
     /// the footer. The panel wires this (T03).
