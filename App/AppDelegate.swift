@@ -31,6 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let captureService = capturePipeline?.captureService
         let panel = PanelController(draftStore: DraftStore(fileURL: StorageLocations.draft)) {
             destinations?.defaultID.flatMap { destinations?.config(for: $0)?.name } ?? "No destination"
+        } refreshDestination: {
+            // A folder destination re-bookmarks a renamed folder here, which updates its name.
+            guard let destination = destinations?.defaultID.flatMap({ destinations?.destination(for: $0) }) else {
+                return
+            }
+            _ = await destination.healthCheck()
         } submit: { text in
             await captureService?.submit(text: text) ?? false
         }
@@ -49,7 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItemController = StatusItemController(
             hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
-            panelController: panel
+            panelController: panel,
+            folderChooser: capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
         )
     }
 

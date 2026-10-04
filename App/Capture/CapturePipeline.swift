@@ -15,11 +15,18 @@ final class CapturePipeline {
 
     private var wakeObserver: (any NSObjectProtocol)?
 
-    /// No disk work: the outbox and recents are read on first use.
+    /// No file I/O: the outbox and recents are read on first use, and the default inbox folder is
+    /// created on the first save.
     init() {
-        // T06 registers the folder builder; until then configured destinations resolve to nothing
-        // and their captures wait in the outbox.
-        let destinations = DestinationRegistry(defaults: .standard, factory: DestinationFactory())
+        // The builder saves re-created bookmarks back to the registry it's registered with.
+        let registryReference = RegistryReference()
+        var factory = DestinationFactory()
+        factory.registerFolder { id, bookmark, displayPath in
+            registryReference.registry?.updateFolderBookmark(id, bookmark: bookmark, displayPath: displayPath)
+        }
+        let destinations = DestinationRegistry(defaults: .standard, factory: factory)
+        registryReference.registry = destinations
+        destinations.addDefaultInboxIfEmpty()
         let outbox = Outbox(directory: StorageLocations.outbox)
         let recents = RecentStore(fileURL: StorageLocations.recents)
         let delivery = DeliveryService(
@@ -52,4 +59,10 @@ final class CapturePipeline {
             await delivery.kick()
         }
     }
+}
+
+/// Lets the folder builder reach the registry, which is created after the factory it's given.
+/// Set once, on the main thread, before any destination is built.
+private final class RegistryReference: @unchecked Sendable {
+    weak var registry: DestinationRegistry?
 }

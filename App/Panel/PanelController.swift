@@ -20,6 +20,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let frameStore: PanelFrameStore
     private let draftStore: DraftStore
     private let destinationName: @MainActor () -> String
+    private let refreshDestination: @MainActor () async -> Void
     private let submitNote: @MainActor (_ text: String) async -> Bool
 
     /// Fading out: still on screen but already counted as hidden.
@@ -37,16 +38,21 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
-    /// - Parameter submit: Puts the note in the outbox. Returns `true` once it's safe there.
+    /// - Parameters:
+    ///   - refreshDestination: Checks the default destination, so a renamed folder's new name is
+    ///     saved before `destinationName` is read again.
+    ///   - submit: Puts the note in the outbox. Returns `true` once it's safe there.
     init(
         defaults: UserDefaults = .standard,
         draftStore: DraftStore,
         destinationName: @escaping @MainActor () -> String,
+        refreshDestination: @escaping @MainActor () async -> Void = {},
         submit: @escaping @MainActor (_ text: String) async -> Bool
     ) {
         frameStore = PanelFrameStore(defaults: defaults)
         self.draftStore = draftStore
         self.destinationName = destinationName
+        self.refreshDestination = refreshDestination
         submitNote = submit
         panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
@@ -90,6 +96,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         isHiding = false
 
         content.setDestinationName(destinationName())
+        // The folder may have been renamed in Finder since; checking it is disk work, so it's done
+        // off the show path and the name updated after.
+        Task {
+            await refreshDestination()
+            content.setDestinationName(destinationName())
+        }
         if !didRestoreDraft {
             didRestoreDraft = true
             content.editor.setText(draftStore.load()?.text ?? "")
