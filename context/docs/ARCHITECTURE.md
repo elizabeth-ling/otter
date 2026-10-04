@@ -77,6 +77,7 @@ public struct Capture: Codable, Identifiable, Sendable {
     public let createdAt: Date
     public let timeZoneIdentifier: String // TimeZone.current at capture time; delivery formats createdAt in it
     public var text: String
+    public var title: String?           // set by ⌘S save-as (T16); nil = unnamed
     public var attachments: [Attachment]
     public var destinationID: DestinationID
     public var source: Source           // .panel | .clipboard
@@ -150,7 +151,7 @@ sequenceDiagram
 
 ### 5.1 Folder
 
-- **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`. `title` = first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
+- **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`, or `{title}.md` when the user named the note with `⌘S` (T16; same character rules). For unnamed notes, `title` = first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
 - **Append to file**: creates the file if missing; ensures a trailing newline; appends a block rendered from a template (default below).
 - Optional YAML frontmatter on new files: `created` (ISO 8601 with offset), `source: otter`.
 - **Writes are atomic for new files** (temp file in the same directory + rename) and **coordinated for appends** (`NSFileCoordinator` with `.forMerging`, then `FileHandle.seekToEnd()` + write + `synchronize()`), which keeps iCloud Drive and Obsidian's file watcher happy.
@@ -165,7 +166,7 @@ Default append template:
 {{/multi_line}}
 ```
 
-Implemented as a tiny hand-rolled renderer (`{{time}}`, `{{date}}`, `{{text}}`, `{{attachments}}`, two conditional sections). No templating dependency.
+Implemented as a tiny hand-rolled renderer (`{{time}}`, `{{date}}`, `{{text}}`, `{{title}}`, `{{attachments}}`, two conditional sections). A named capture (T16) always uses the multi-line block, with `### {{time}} {{title}}` as its heading. No templating dependency.
 
 ### 5.2 Obsidian
 
@@ -206,7 +207,9 @@ isMovableByWindowBackground = true
 override var canBecomeKey: Bool { true }
 ```
 
-Because it is **non-activating**, showing it does not activate Otter — the previously frontmost app stays active, and when the panel hides, keyboard focus returns to it with no `NSApp.activate`/`hide` dance. The panel is created once at launch and only ordered in/out, so showing it costs a single `makeKeyAndOrderFront`. Settings and onboarding are ordinary windows that *do* activate the app.
+Because it is **non-activating**, showing it does not activate Otter — the previously frontmost app stays active, and when the panel hides, keyboard focus returns to it with no `NSApp.activate`/`hide` dance. The panel is created once at launch and only ordered in/out, so showing it costs a single `makeKeyAndOrderFront`.
+
+The panel is a sticky note, not a bar (ADR-012): it opens at a user-resizable size (default 380 × 300 pt) and doesn't auto-grow. Its size (`panelSize`) and its position per display (`panelPositions`, keyed by display UUID, stored as an offset from that display's `visibleFrame`) live in `UserDefaults`, are cached in memory, and are clamped on-screen at every show (T15). Only drags of the header or footer move it; the text view returns `mouseDownCanMoveWindow = false`. Settings and onboarding are ordinary windows that *do* activate the app.
 
 ## 7. Permissions
 

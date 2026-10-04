@@ -2,57 +2,78 @@
 
 ## 1. The capture panel
 
-Modelled on the ChatGPT desktop overlay: a single rounded, translucent bar floating above everything, centered in the upper part of the screen. It starts as one line and grows downward as you type. There is no window chrome.
+A small sticky-note panel floating above everything (reference: `context/ui/box-ui.png`). It opens as a ready-to-type text box, narrower and taller than a search bar, so it reads as a place to write rather than a place to search. The user can drag it anywhere and it reopens where they left it. There is no title bar or traffic lights.
 
-**Empty (compact bar)**
-
-```
-╭──────────────────────────────────────────────────────────────╮
-│  ●  Jot something down…                                ⌘↩    │
-╰──────────────────────────────────────────────────────────────╯
-```
-
-**Typing (expanded)**
+**Empty**
 
 ```
-╭──────────────────────────────────────────────────────────────╮
-│  ●  Pick up oat milk + call Sam re: Q4 deck                  │
-│     - ask about the revised budget numbers▍                  │
-│                                                              │
-│     [🖼 img.png ✕]  [📄 spec.pdf ✕]       ← attachment chips  │
-│  ──────────────────────────────────────────────────────────  │
-│     Daily note · Obsidian ▾                       ⌘↩ Save    │
-╰──────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────╮
+│  ● Daily note · Obsidian             │  ← header: drag handle
+│                                      │
+│  Jot something down…                 │
+│                                      │
+│                                      │
+│                                      │
+│                                      │
+│  ──────────────────────────────────  │
+│              ⌘↩ Save · ⌘S Save as…   │
+╰──────────────────────────────────────╯
 ```
 
-The `●` on the left is the destination dot (colored per destination). The footer row (destination name and save hint) appears once there is text or an attachment, so the empty state stays a clean one-line bar.
+**Typing, with attachments**
+
+```
+╭──────────────────────────────────────╮
+│  ● Daily note · Obsidian ▾           │
+│                                      │
+│  Pick up oat milk + call Sam re: Q4  │
+│  deck                                │
+│  - ask about the revised budget      │
+│    numbers▍                          │
+│                                      │
+│  [🖼 img.png ✕]  [📄 spec.pdf ✕]     │
+│  ──────────────────────────────────  │
+│              ⌘↩ Save · ⌘S Save as…   │
+╰──────────────────────────────────────╯
+```
+
+**Save as (`⌘S`)**
+
+```
+│  ──────────────────────────────────  │
+│  Save as [2026-10-03 2051        ]   │  ← pre-filled, selected
+│                  ↩ Save · Esc Cancel │
+╰──────────────────────────────────────╯
+```
+
+The `●` in the header is the destination dot (colored per destination), next to the destination name. The footer is always shown. `⌘S` slides a "Save as" row in above the footer, pre-filled with the save's date and time; `↩` saves under that name and clears the panel for a new note, `Esc` goes back to the text (T16).
 
 | Property | Value |
 |---|---|
-| Width | 640 pt (user-resizable horizontally, remembered) |
-| Height | Compact bar 56 pt; grows with content to 420 pt, then scrolls |
-| Corner radius | 16 pt (fully pill-like in the compact state) |
-| Position | Screen containing the mouse pointer; horizontally centered; top edge at ~22% of the visible frame |
+| Size | Opens at 380 × 300 pt. Resizable both ways (min 300 × 180, max 720 × 640, capped to the screen); size remembered |
+| Height | Fixed at the user's size; text scrolls inside. The panel doesn't grow as you type |
+| Corner radius | 12 pt |
+| Position | Screen containing the mouse pointer. Wherever the user last dragged it on that display (remembered per display, across relaunches); otherwise horizontally centered with the top edge at ~22% of the visible frame. Always kept fully on-screen. Menu bar "Reset Panel Position" restores the default |
 | Background | Vibrancy (`NSVisualEffectView`, `.popover`/`.hudWindow` material), thin 0.5 pt separator-color border, system shadow |
 | Stacking | Floats above all normal app windows, including full-screen apps, on whichever Space you're on |
-| Font | System font, 16 pt in the compact bar (setting: system / monospaced, size) |
+| Font | System font, 15 pt (setting: system / monospaced, size) |
 | Placeholder | "Jot something down…" |
-| Chrome | No title bar, no traffic lights. Draggable by background |
+| Chrome | No title bar, no traffic lights. Dragged by the header strip or footer background; dragging in the text selects text |
 | Animation | 80 ms fade-in/out; none if Reduce Motion is on |
 
 ### Footer
 
-- **Destination pill** (left): colored dot + destination name. Click or `⌘1…⌘9` switches destination for *this note only*. The default comes back on the next open.
-- **Hint** (right): `⌘↩ Save`. Turns into an inline warning when relevant, e.g. "Apple Notes can't take images yet — they'll be dropped."
-- **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the pill. Click → menu with Retry / Show details.
+- **Destination pill** (in the header): colored dot + destination name. Click or `⌘1…⌘9` switches destination for *this note only*. The default comes back on the next open.
+- **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an inline warning when relevant, e.g. "Apple Notes can't take images yet — they'll be dropped."
+- **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the destination pill. Click → menu with Retry / Show details.
 
 ### States
 
 | State | What the user sees |
 |---|---|
-| Empty | Placeholder, footer with default destination |
+| Empty | Placeholder, header with default destination |
 | Draft restored | Previous draft text, cursor at end, text **not** selected (so typing appends) |
-| Typing | Panel grows with content |
+| Typing | Text scrolls inside the panel once it's longer than the panel |
 | Saving | Nothing — the panel closes immediately on `⌘↩` (optimistic) |
 | Delivery failed | Menu bar icon gets an amber badge; macOS notification once per failure burst; badge in panel footer next open |
 
@@ -64,6 +85,7 @@ The `●` on the left is the destination dot (colored per destination). The foot
 | *unset (suggest `⌥⇧Space`)* | Global | Save clipboard as a note instantly, show HUD |
 | `⌘↩` | Panel | Save and close |
 | `⇧⌘↩` | Panel | Save and keep open (cleared, ready for the next note) |
+| `⌘S` | Panel | Save as: name the note (defaults to the save's date and time), save it, keep the panel open for a new note |
 | `Esc` | Panel | Close. Draft is kept and restored next time |
 | `⇧⌘⌫` | Panel | Discard draft (and attachments) |
 | `⌘1` … `⌘9` | Panel | Choose destination for this note |
@@ -113,6 +135,7 @@ Clicking a recent item opens it where it lives: reveal in Finder (Folder), `obsi
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
 - Smart quotes and dashes (off by default — notes often contain code)
+- Reset panel position and size
 
 **Destinations**
 - List of destinations with drag-to-reorder (order = `⌘1…⌘9`), star = default

@@ -13,7 +13,7 @@ Replace the temporary menu items with a real Settings window, and get a new user
 ## Scope
 
 1. Settings window (SwiftUI, hosted in an `NSWindow` you control; opening it calls `NSApp.activate()` since Otter is an agent app). Three tabs per UX_SPEC §5.
-2. **General**: two `KeyboardShortcuts.Recorder`s (with reserved-shortcut warning from T02), Launch at login toggle (wired in T12), close-on-click-away, font family/size, smart quotes/dashes.
+2. **General**: two `KeyboardShortcuts.Recorder`s (with reserved-shortcut warning from T02), Launch at login toggle (wired in T12), close-on-click-away, font family/size, smart quotes/dashes, and a "Reset panel position and size" button (moved from T15's menu item).
 3. **Destinations**:
    - List with icon, name, mode summary, health dot (green/amber/red from `healthCheck()`), star for default, drag to reorder (order = `⌘1…⌘9`).
    - Add menu: detected Obsidian vaults (from `VaultDiscovery`) · Apple Notes · Folder…

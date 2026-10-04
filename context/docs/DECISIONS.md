@@ -122,3 +122,16 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - The save-clipboard shortcut still ships unset (suggest `⌥⇧Space`).
 
 **Consequences.** Most users never see the Spotlight step. `⌥Space` may already be taken by ChatGPT or Raycast, so onboarding's press-to-confirm check and recorder matter more (ADR-006's concern). macOS 15.0–15.1 reject hotkeys whose only modifier is `⌥`, and KeyboardShortcuts swallows that error, so the default may silently fail there; T14 should check it.
+
+---
+
+## ADR-012 · The panel is a movable sticky note, not a Spotlight-style bar
+
+**Context.** T03 built a 640 pt wide, one-line bar that grows downward as you type, modelled on the ChatGPT/Spotlight overlay. In use it reads as a search box, not a place to write, and it always opens in the same spot whatever the user prefers. The product owner wants it closer to a sticky note (reference: `context/ui/box-ui.png`).
+
+**Decision.**
+- The panel opens as a multi-line text box at 380 × 300 pt, resizable in both directions, with a header strip (drag handle and destination) and an always-visible footer. It doesn't auto-grow; text scrolls.
+- The user can drag it, and it reopens where it was left: one remembered position per display, stored as an offset from that display's visible frame and keyed by display UUID. It still opens on the display with the pointer, and is always clamped fully on-screen.
+- The non-activating focus behavior from ADR-001 is unchanged.
+
+**Consequences.** T04 loses its auto-height work; T15 replaces T03's layout and placement. A remembered position can be far from the pointer on a large display, which is the trade-off the user asked for; "Reset Panel Position" undoes it.

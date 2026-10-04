@@ -34,8 +34,8 @@ These are the tie-breakers for every decision.
 ### In (v1)
 
 - Menu-bar agent app (no Dock icon), launches at login.
-- Global hotkey **`⌥Space`** (fully configurable; onboarding offers `⌘Space` and walks you through moving Spotlight off it) toggles a ChatGPT-overlay-style floating bar above any app, Space or full-screen window.
-- Plain-text editor with draft autosave; `⌘↩` to save and close; `Esc` to close and keep the draft.
+- Global hotkey **`⌥Space`** (fully configurable; onboarding offers `⌘Space` and walks you through moving Spotlight off it) toggles a small floating sticky-note panel above any app, Space or full-screen window. It can be dragged anywhere and reopens where you left it.
+- Plain-text editor with draft autosave; `⌘↩` to save and close; `⌘S` to save under a name (defaults to the date and time) and start a new note; `Esc` to close and keep the draft.
 - Destinations:
   - **Folder** — new file per note, or append to a single inbox file.
   - **Obsidian** — vault auto-discovery; append to today's daily note (default), append to an inbox note, or new note in a folder. Respects the vault's daily-note and attachment settings.
