@@ -106,6 +106,18 @@ public final class DestinationRegistry: Sendable {
         }
     }
 
+    /// Changes the config with `id` in place, under the lock, so a concurrent change isn't lost. The
+    /// next lookup rebuilds the destination.
+    public func modify(_ id: DestinationID, _ change: @escaping @Sendable (inout DestinationConfig) -> Void) {
+        mutate { state in
+            guard let index = state.configs.firstIndex(where: { $0.id == id }) else {
+                return
+            }
+            change(&state.configs[index])
+            state.built[id] = nil
+        }
+    }
+
     /// Removes a destination. If it was the default, the first remaining one takes over.
     public func remove(_ id: DestinationID) {
         mutate { state in

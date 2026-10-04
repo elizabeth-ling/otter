@@ -105,3 +105,122 @@ private func fakeFactory(clock: TestClock = TestClock()) -> DestinationFactory {
     #expect(try JSONDecoder().decode([DestinationConfig].self, from: data) == [config])
     #expect(config.kind == .folder)
 }
+
+// MARK: - Folder destinations (T06)
+
+@Test func modifyChangesOneConfigAndRebuildsItsDestination() {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: fakeFactory())
+    let inbox = folder("Inbox")
+    registry.add(inbox)
+    let before = registry.destination(for: inbox.id)
+
+    registry.modify(inbox.id) { $0.name = "Renamed" }
+
+    #expect(registry.config(for: inbox.id)?.name == "Renamed")
+    #expect(registry.destination(for: inbox.id)?.displayName == "Renamed")
+    #expect(before?.displayName == "Inbox")
+}
+
+@Test func defaultInboxIsAddedOnlyWhenNothingIsConfigured() throws {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: DestinationFactory())
+    let documents = URL(fileURLWithPath: "/Users/me/Documents", isDirectory: true)
+
+    registry.addDefaultInboxIfEmpty(documents: documents)
+    registry.addDefaultInboxIfEmpty(documents: documents)
+
+    #expect(registry.configs.count == 1)
+    let inbox = try #require(registry.configs.first)
+    #expect(registry.defaultID == inbox.id)
+    #expect(inbox.name == "Otter Inbox")
+    guard case let .folder(options) = inbox.options else {
+        Issue.record("The default inbox is a folder destination")
+        return
+    }
+    #expect(options.bookmark.isEmpty)
+    #expect(options.fallbackPath == "/Users/me/Documents/Otter Inbox")
+    #expect(options.mode == .newFilePerNote)
+}
+
+@Test func choosingAFolderRepointsTheDefaultFolderDestinationKeepingItsID() {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: DestinationFactory())
+    registry.addDefaultInboxIfEmpty(documents: URL(fileURLWithPath: "/Users/me/Documents"))
+    let inboxID = registry.defaultID
+
+    let chosen = registry.chooseFolder(bookmark: Data("vault".utf8), displayPath: "~/Vault", name: "Vault")
+
+    #expect(chosen == inboxID)
+    #expect(registry.configs.count == 1)
+    let config = registry.config(for: chosen)
+    #expect(config?.name == "Vault")
+    guard case let .folder(options)? = config?.options else {
+        Issue.record("Still a folder destination")
+        return
+    }
+    #expect(options.bookmark == Data("vault".utf8))
+    #expect(options.displayPath == "~/Vault")
+    #expect(options.fallbackPath == nil)
+}
+
+@Test func choosingAFolderWithNoDestinationAddsOneAsTheDefault() {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: DestinationFactory())
+
+    let chosen = registry.chooseFolder(bookmark: Data("vault".utf8), displayPath: "~/Vault", name: "Vault")
+
+    #expect(registry.defaultID == chosen)
+    #expect(registry.config(for: chosen)?.name == "Vault")
+}
+
+@Test func updatingABookmarkFollowsAFolderRename() {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: DestinationFactory())
+    let config = DestinationConfig(name: "Old", options: .folder(FolderOptions(bookmark: Data("old".utf8), displayPath: "~/Notes/Old")))
+    registry.add(config)
+
+    registry.updateFolderBookmark(config.id, bookmark: Data("new".utf8), displayPath: "~/Notes/New")
+
+    #expect(registry.config(for: config.id)?.name == "New")
+}
+
+@Test func updatingABookmarkKeepsTheOtherSettings() {
+    let suite = TestDefaults()
+    defer { suite.remove() }
+    let registry = DestinationRegistry(defaults: suite.defaults, factory: DestinationFactory())
+    let options = FolderOptions(bookmark: Data("old".utf8), displayPath: "~/Old", mode: .appendToFile(name: "Inbox.md"), subfolder: "Daily", frontmatter: false)
+    let config = DestinationConfig(name: "Journal", options: .folder(options))
+    registry.add(config)
+
+    registry.updateFolderBookmark(config.id, bookmark: Data("new".utf8), displayPath: "~/New")
+
+    var expected = options
+    expected.bookmark = Data("new".utf8)
+    expected.displayPath = "~/New"
+    #expect(registry.config(for: config.id)?.options == .folder(expected))
+    #expect(registry.config(for: config.id)?.name == "Journal")
+}
+
+@Test func folderOptionsSavedBeforeT06DecodeWithDefaults() throws {
+    let json = #"{"bookmark":"AQID","displayPath":"~/Notes"}"#
+    let options = try JSONDecoder().decode(FolderOptions.self, from: Data(json.utf8))
+
+    #expect(options == FolderOptions(bookmark: Data([1, 2, 3]), displayPath: "~/Notes"))
+    #expect(options.mode == .newFilePerNote)
+    #expect(options.filenameTemplate == "{date} {time} {title}")
+    #expect(options.frontmatter)
+    #expect(options.appendTemplate == AppendTemplate.default)
+    #expect(options.attachmentsFolder == "attachments")
+}
+
+@Test func folderOptionsRoundTripThroughJSON() throws {
+    let options = FolderOptions(bookmark: Data([9]), displayPath: "~/V", fallbackPath: "/V", mode: .appendToFile(name: "Inbox.md"), subfolder: "Daily", filenameTemplate: "{title}", frontmatter: false, appendTemplate: "{{text}}", attachmentsFolder: "files")
+    let decoded = try JSONDecoder().decode(FolderOptions.self, from: JSONEncoder().encode(options))
+    #expect(decoded == options)
+}

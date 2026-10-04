@@ -47,7 +47,7 @@ Otter/
 │   ├── Panel/AttachmentChips.swift
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
-│   ├── MenuBar/StatusItemController.swift
+│   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10
 │   ├── Settings/…                # SwiftUI views
 │   ├── Onboarding/…
 │   └── Resources/Info.plist, Assets.xcassets
@@ -57,7 +57,8 @@ Otter/
     │   ├── Pipeline/Outbox.swift, DeliveryService.swift, DeliveryClock.swift, RecentStore.swift, DraftStore.swift,
     │   │            CaptureFailure.swift, StorageLocations.swift
     │   ├── Destinations/Destination.swift, DestinationRegistry.swift
-    │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift
+    │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift,
+│   │                       FolderBookmark.swift, FolderRegistration.swift   # builder, default inbox (T06)
     │   ├── Destinations/Obsidian/ObsidianDestination.swift, VaultDiscovery.swift,
     │   │                         DailyNoteResolver.swift, MomentFormat.swift
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
@@ -105,7 +106,7 @@ public struct DeliveryReceipt: Codable, Sendable {
 }
 ```
 
-`DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working.
+`DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working. A refreshed bookmark (the folder was renamed) is saved back to the registry. With nothing configured, the registry holds the default inbox, `~/Documents/Otter Inbox/`, which has no bookmark until the first save creates the folder.
 
 ## 4. The capture pipeline
 
@@ -152,8 +153,9 @@ sequenceDiagram
 ### 5.1 Folder
 
 - **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`, or `{title}.md` when the user named the note with `⌘S` (T16; same character rules). For unnamed notes, `title` = first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
-- **Append to file**: creates the file if missing; ensures a trailing newline; appends a block rendered from a template (default below).
+- **Append to file**: creates the file if missing; ensures a trailing newline; appends a block rendered from a template (default below), with one blank line between blocks. `{{time}}` is `HH:mm`.
 - Optional YAML frontmatter on new files: `created` (ISO 8601 with offset), `source: otter`.
+- A folder that was deleted (including one sitting in the Trash, where its bookmark still resolves) is "Folder missing": captures stay in the outbox until it's recreated where it was or another folder is chosen. Only the default inbox is recreated automatically.
 - **Writes are atomic for new files** (temp file in the same directory + rename) and **coordinated for appends** (`NSFileCoordinator` with `.forMerging`, then `FileHandle.seekToEnd()` + write + `synchronize()`), which keeps iCloud Drive and Obsidian's file watcher happy.
 
 Default append template:
