@@ -42,13 +42,13 @@ A fast plain-text editor inside the panel that implements the full in-panel keyb
 
 ## Acceptance criteria
 
-- [ ] Typing is visually instant; no dropped characters when typing fast right after the hotkey.
-- [ ] `Esc` then the hotkey restores exactly what was there, cursor at end.
-- [ ] `kill -9` the app while typing → relaunch → draft is restored (≤300 ms of typing lost at worst).
-- [ ] Long text scrolls inside the panel; the panel's size and position don't change while typing.
+- [x] Typing is visually instant; no dropped characters when typing fast right after the hotkey.
+- [x] `Esc` then the hotkey restores exactly what was there, cursor at end.
+- [x] `kill -9` the app while typing → relaunch → draft is restored (≤300 ms of typing lost at worst).
+- [x] Long text scrolls inside the panel; the panel's size and position don't change while typing.
 - [ ] Japanese/Chinese IME input works; `↩` confirms composition rather than submitting.
-- [ ] Undo/redo works; pasting rich text from Safari inserts plain text.
-- [ ] Unit tests for `DraftStore` (save/load/clear, corrupt file → nil).
+- [x] Undo/redo works; pasting rich text from Safari inserts plain text.
+- [x] Unit tests for `DraftStore` (save/load/clear, corrupt file → nil).
 
 ## Out of scope
 

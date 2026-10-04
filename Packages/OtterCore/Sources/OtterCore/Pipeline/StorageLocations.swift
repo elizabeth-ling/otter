@@ -11,6 +11,11 @@ public enum StorageLocations {
         root.appendingPathComponent("outbox", isDirectory: true)
     }
 
+    /// The in-progress note (T04). Pasted files are staged next to it in `drafts/files/` (T09).
+    public static var draft: URL {
+        root.appendingPathComponent("drafts", isDirectory: true).appendingPathComponent("current.json")
+    }
+
     public static var recents: URL {
         root.appendingPathComponent("recent.json")
     }
