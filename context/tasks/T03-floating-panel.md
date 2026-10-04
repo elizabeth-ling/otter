@@ -38,13 +38,13 @@ This is the task that makes or breaks the "frictionless" feel. Spend the time to
 
 ## Acceptance criteria
 
-- [ ] From TextEdit: press the hotkey, type, `Esc` → you can immediately keep typing in TextEdit without clicking.
-- [ ] Otter never appears in `⌘⇥` and never becomes the active app (menu bar still shows the previous app's name while the panel is open).
-- [ ] Appears on the current Space and over a full-screen Safari window.
+- [x] From TextEdit: press the hotkey, type, `Esc` → you can immediately keep typing in TextEdit without clicking.
+- [x] Otter never appears in `⌘⇥` and never becomes the active app (menu bar still shows the previous app's name while the panel is open).
+- [x] Appears on the current Space and over a full-screen Safari window.
 - [ ] With two displays, appears on the display with the pointer.
-- [ ] Clicking outside closes it.
-- [ ] Hotkey → visible measured < 100 ms (Instruments signpost), target 50 ms.
-- [ ] Works in Light and Dark mode; respects Reduce Motion and Reduce Transparency.
+- [x] Clicking outside closes it.
+- [x] Hotkey → visible measured < 100 ms (Instruments signpost), target 50 ms.
+- [x] Works in Light and Dark mode; respects Reduce Motion and Reduce Transparency.
 
 ## Out of scope
 
