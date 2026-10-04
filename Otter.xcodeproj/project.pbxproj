@@ -21,7 +21,6 @@
 			membershipExceptions = (
 				HUD/.gitkeep,
 				Onboarding/.gitkeep,
-				Panel/.gitkeep,
 				Resources/Info.plist,
 				Settings/.gitkeep,
 			);

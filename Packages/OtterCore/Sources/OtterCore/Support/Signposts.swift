@@ -6,6 +6,6 @@ import os
 public enum Signpost {
     public static let log = OSLog(subsystem: Logger.subsystem, category: .pointsOfInterest)
 
-    /// Begun by `HotkeyService` on the toggle key press; ended by the panel controller (T03) once the panel is key.
+    /// Begun by `PanelController` when a toggle press shows the panel; ended once the panel is key.
     public static let hotkeyToVisible: StaticString = "hotkey→visible"
 }

@@ -24,15 +24,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItemController: StatusItemController?
     private var hotkeyService: HotkeyService?
+    private var panelController: PanelController?
 
     // Keep this minimal: it sits on the cold-launch path (ARCHITECTURE §9).
     // Later tasks register services here; anything slow must be deferred.
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Built once here and only ordered in and out (ARCHITECTURE §6).
+        let destinations = capturePipeline?.destinations
+        let panel = PanelController {
+            destinations?.defaultID.flatMap { destinations?.config(for: $0)?.name } ?? "No destination"
+        }
+        panelController = panel
+
         let hotkeys = HotkeyService()
-        // Until the panel lands (T03), the toggle only proves the hotkey fires.
         hotkeys.onTogglePanel = {
-            Logger.hotkey.info("Toggle panel hotkey pressed")
-            NSSound.beep()
+            panel.toggle()
         }
         // Until clipboard capture lands (T11).
         hotkeys.onSaveClipboard = {

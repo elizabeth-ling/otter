@@ -140,8 +140,7 @@ final class HotkeyService {
     // MARK: - Private
 
     private func toggleKeyDown() {
-        // T03 ends this interval once the panel is key.
-        os_signpost(.begin, log: Signpost.log, name: Signpost.hotkeyToVisible)
+        // The panel controller begins the `hotkey→visible` signpost when the press shows the panel.
         onTogglePanel?()
         // "Re-probe when the panel opens", kept off the hotkey → visible path.
         Task { [weak self] in
