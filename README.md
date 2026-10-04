@@ -7,6 +7,10 @@
 Otter is NOT a notes app.
 No account. No backend. Your data stays on your Mac by default.
 
+
+![otter display](images/example.png)
+![otter display on top of full screen app](images/overlay-ex.png)
+
 ## docs
 
 | Doc | What's in it |
