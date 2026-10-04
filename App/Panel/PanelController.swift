@@ -35,6 +35,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var didRestoreDraft = false
     /// A note is on its way to the outbox; further submits wait for it.
     private var isSubmitting = false
+    /// When the shown panel last resigned key, and when the active Space last changed (`systemUptime`).
+    /// Close together they're a Space switch, not a click elsewhere (`PanelSpaceSwitch`).
+    private var lastResignKeyAt: TimeInterval?
+    private var lastSpaceChangeAt: TimeInterval?
+    private var spaceChangeObserver: (any NSObjectProtocol)?
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
@@ -65,6 +70,16 @@ final class PanelController: NSObject, NSWindowDelegate {
         content.editor.onCommand = { [weak self] command in self?.perform(command) }
         content.editor.onTextChange = { [weak self] in self?.saveDraft() }
 
+        spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.activeSpaceDidChange()
+            }
+        }
+
         // Read off the main thread now, so the first show finds it in memory.
         DispatchQueue.global(qos: .utility).async {
             _ = draftStore.load()
@@ -91,6 +106,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             panel.makeKeyAndOrderFront(nil)
             return
         }
+        lastResignKeyAt = nil
         fadeGeneration += 1
         let wasHiding = isHiding
         isHiding = false
@@ -166,11 +182,22 @@ final class PanelController: NSObject, NSWindowDelegate {
         os_signpost(.end, log: Signpost.log, name: Signpost.hotkeyToVisible)
     }
 
-    /// Clicking elsewhere closes the panel.
+    /// Clicking elsewhere closes the panel. Switching Spaces doesn't, although it also takes key.
     func windowDidResignKey(_ notification: Notification) {
-        guard !keepOpenWhenClickingElsewhere else {
+        // Not shown: an `Esc` or hotkey hide is ordering it out.
+        guard !keepOpenWhenClickingElsewhere, isShown else {
             return
         }
+        let now = ProcessInfo.processInfo.systemUptime
+        Logger.panel.debug("Panel resigned key")
+        if PanelSpaceSwitch.isSpaceSwitch(resignedAt: now, spaceChangedAt: lastSpaceChangeAt) {
+            // The Space changed first. Take key back once AppKit has finished handing it over.
+            DispatchQueue.main.async { [weak self] in
+                self?.restoreAfterSpaceSwitch()
+            }
+            return
+        }
+        lastResignKeyAt = now
         hide()
     }
 
@@ -195,6 +222,28 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func beginVisibleSignpost() {
         awaitingVisible = true
         os_signpost(.begin, log: Signpost.log, name: Signpost.hotkeyToVisible)
+    }
+
+    /// A resign-key just before this hid the panel: bring it back.
+    private func activeSpaceDidChange() {
+        let now = ProcessInfo.processInfo.systemUptime
+        Logger.panel.debug("Active Space changed")
+        if !isShown, PanelSpaceSwitch.isSpaceSwitch(resignedAt: lastResignKeyAt, spaceChangedAt: now) {
+            restoreAfterSpaceSwitch()
+        } else {
+            lastSpaceChangeAt = now
+        }
+    }
+
+    /// Back on screen and key where it was, cancelling any fade-out. Unlike `show()` it isn't
+    /// re-placed under the pointer and the caret stays put.
+    private func restoreAfterSpaceSwitch() {
+        lastResignKeyAt = nil
+        lastSpaceChangeAt = nil
+        fadeGeneration += 1
+        isHiding = false
+        panel.makeKeyAndOrderFront(nil)
+        fade(to: 1, animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, completion: nil)
     }
 
     private func focusEditor() {

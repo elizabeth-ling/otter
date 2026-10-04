@@ -54,6 +54,7 @@ Reference: `context/ui/box-ui.png` (the ChatGPT desktop window). Take its compac
 - [ ] Lower the resolution, or move the Dock, so a saved position would be off-screen: the panel opens fully visible.
 - [ ] "Reset Panel Position" puts it back to the default size and placement.
 - [ ] All T03 focus criteria still pass (TextEdit focus return, no `⌘⇥` entry, full-screen Space, click-outside closes).
+- [ ] With the panel open, switching Spaces or full-screen apps keeps it open and focused on the new Space, with no flicker.
 - [ ] Unit tests for `PanelPlacement`: restore, clamp on smaller screen, missing display, size migration.
 
 ## Out of scope
