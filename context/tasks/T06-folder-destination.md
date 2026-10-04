@@ -54,13 +54,13 @@ Write captures as Markdown into any folder the user picks, either one file per n
 
 ## Acceptance criteria
 
-- [ ] Unit tests: `FileNamer` edge cases (emoji, only punctuation, very long line, leading `# `, path traversal attempts, collisions).
-- [ ] Unit tests: `MarkdownWriter` new-file and append rendering, single vs multi-line templates.
-- [ ] Integration test (temp dir): 50 concurrent appends from the delivery lane produce 50 intact blocks in order.
-- [ ] Manual: point at an Obsidian vault folder with Obsidian open → new notes appear in Obsidian within a second.
-- [ ] Manual: rename the chosen folder in Finder → next capture still lands in it (bookmark).
-- [ ] Manual: delete the folder → capture stays in outbox, error visible in logs; recreate/choose again → delivered.
-- [ ] **M0 demo:** hotkey → type → `⌘↩` → file exists, and you're back in your previous app.
+- [x] Unit tests: `FileNamer` edge cases (emoji, only punctuation, very long line, leading `# `, path traversal attempts, collisions).
+- [x] Unit tests: `MarkdownWriter` new-file and append rendering, single vs multi-line templates.
+- [x] Integration test (temp dir): 50 concurrent appends from the delivery lane produce 50 intact blocks in order.
+- [x] Manual: point at an Obsidian vault folder with Obsidian open → new notes appear in Obsidian within a second.
+- [x] Manual: rename the chosen folder in Finder → next capture still lands in it (bookmark).
+- [x] Manual: delete the folder → capture stays in outbox, error visible in logs; recreate/choose again → delivered.
+- [x] **M0 demo:** hotkey → type → `⌘↩` → file exists, and you're back in your previous app.
 
 ## Out of scope
 
