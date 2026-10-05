@@ -43,6 +43,7 @@ Otter/
 │   │          HotkeyWindowController.swift   # temporary recorder window until T10
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)
+│   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
 │   ├── Panel/AttachmentChips.swift
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)

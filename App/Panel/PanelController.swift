@@ -6,8 +6,9 @@ import os
 /// submitting and the saved draft (T04). The panel is built once here and only ordered in and out,
 /// so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
 ///
-/// Never calls `NSApp.activate`: the panel is non-activating, so the app the user came from stays
-/// active and gets keyboard focus back on hide.
+/// Never calls `NSApp.activate` itself: the panel is non-activating, so the app the user came from
+/// stays active and gets keyboard focus back on hide. The folder picker (T17) is the exception; see
+/// `appToReactivate`.
 @MainActor
 final class PanelController: NSObject, NSWindowDelegate {
     static let fadeDuration: TimeInterval = 0.08
@@ -19,9 +20,13 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let content = PanelContentView()
     private let frameStore: PanelFrameStore
     private let draftStore: DraftStore
-    private let destinationName: @MainActor () -> String
+    private let destination: @MainActor () -> PanelDestination
     private let refreshDestination: @MainActor () async -> Void
     private let submitNote: @MainActor (_ text: String) async -> Bool
+    private let pickFolder: (@MainActor (_ above: NSWindow) async -> Bool)?
+
+    /// What the header shows now.
+    private var shownDestination: PanelDestination?
 
     /// Fading out: still on screen but already counted as hidden.
     private var isHiding = false
@@ -40,25 +45,34 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var lastResignKeyAt: TimeInterval?
     private var lastSpaceChangeAt: TimeInterval?
     private var spaceChangeObserver: (any NSObjectProtocol)?
+    /// The folder picker is open. It takes key, which mustn't hide the panel.
+    private var isChoosingFolder = false
+    /// The app that was frontmost before the folder picker activated Otter. It's activated again
+    /// when the panel hides, so focus lands where it would have without the picker.
+    private var appToReactivate: NSRunningApplication?
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
     /// - Parameters:
+    ///   - destination: The destination the header shows.
     ///   - refreshDestination: Checks the default destination, so a renamed folder's new name is
-    ///     saved before `destinationName` is read again.
+    ///     saved before `destination` is read again.
     ///   - submit: Puts the note in the outbox. Returns `true` once it's safe there.
+    ///   - chooseFolder: Shows the folder picker above the panel. Returns `true` if the folder changed.
     init(
         defaults: UserDefaults = .standard,
         draftStore: DraftStore,
-        destinationName: @escaping @MainActor () -> String,
+        destination: @escaping @MainActor () -> PanelDestination,
         refreshDestination: @escaping @MainActor () async -> Void = {},
-        submit: @escaping @MainActor (_ text: String) async -> Bool
+        submit: @escaping @MainActor (_ text: String) async -> Bool,
+        chooseFolder: (@MainActor (_ above: NSWindow) async -> Bool)? = nil
     ) {
         frameStore = PanelFrameStore(defaults: defaults)
         self.draftStore = draftStore
-        self.destinationName = destinationName
+        self.destination = destination
         self.refreshDestination = refreshDestination
         submitNote = submit
+        pickFolder = chooseFolder
         panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
 
@@ -69,6 +83,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.onCancel = { [weak self] in self?.hide() }
         content.editor.onCommand = { [weak self] command in self?.perform(command) }
         content.editor.onTextChange = { [weak self] in self?.saveDraft() }
+        if chooseFolder != nil {
+            content.onChooseFolder = { [weak self] in self?.chooseFolder() }
+        }
 
         spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
@@ -111,12 +128,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         let wasHiding = isHiding
         isHiding = false
 
-        content.setDestinationName(destinationName())
+        updateDestination()
         // The folder may have been renamed in Finder since; checking it is disk work, so it's done
         // off the show path and the name updated after.
         Task {
             await refreshDestination()
-            content.setDestinationName(destinationName())
+            updateDestination()
         }
         if !didRestoreDraft {
             didRestoreDraft = true
@@ -147,6 +164,14 @@ final class PanelController: NSObject, NSWindowDelegate {
         isHiding = true
         if didRestoreDraft {
             draftStore.saveNow(currentDraft)
+        }
+        if let app = appToReactivate {
+            appToReactivate = nil
+            // Only if Otter still has focus; a click elsewhere has already put it somewhere else.
+            if NSApp.isActive {
+                NSApp.yieldActivation(to: app)
+                app.activate(from: .current, options: [])
+            }
         }
 
         fade(to: 0, animate: !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak self] in
@@ -185,7 +210,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Clicking elsewhere closes the panel. Switching Spaces doesn't, although it also takes key.
     func windowDidResignKey(_ notification: Notification) {
         // Not shown: an `Esc` or hotkey hide is ordering it out.
-        guard !keepOpenWhenClickingElsewhere, isShown else {
+        guard !keepOpenWhenClickingElsewhere, isShown, !isChoosingFolder else {
             return
         }
         let now = ProcessInfo.processInfo.systemUptime
@@ -198,6 +223,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             return
         }
         lastResignKeyAt = now
+        // The user clicked into another app, so that's where focus goes.
+        appToReactivate = nil
         hide()
     }
 
@@ -271,6 +298,46 @@ final class PanelController: NSObject, NSWindowDelegate {
             Logger.panel.info("Destination \(index + 1, privacy: .public) chosen; destinations are picked here from T10")
         case .openSettings:
             Logger.panel.info("Settings requested; they arrive with T10")
+        case .chooseFolder:
+            chooseFolder()
+        }
+    }
+
+    private func updateDestination() {
+        let destination = destination()
+        shownDestination = destination
+        content.setDestination(name: destination.name, folderPath: destination.folderPath)
+    }
+
+    /// The header's folder name or `⇧⌘O` (T17). The panel stays up while the picker is open and is
+    /// key again afterwards, with the text, selection and caret as they were.
+    private func chooseFolder() {
+        guard let pickFolder, isShown, shownDestination?.folderPath != nil else {
+            NSSound.beep()
+            return
+        }
+        guard !isChoosingFolder else {
+            // The picker hides while Otter is inactive; this brings it back.
+            NSApp.activate()
+            return
+        }
+        isChoosingFolder = true
+        if !NSApp.isActive, let frontmost = NSWorkspace.shared.frontmostApplication,
+           frontmost.processIdentifier != NSRunningApplication.current.processIdentifier {
+            appToReactivate = frontmost
+        }
+
+        Task {
+            let changed = await pickFolder(panel)
+            isChoosingFolder = false
+            if changed {
+                updateDestination()
+            }
+            guard isShown else {
+                return
+            }
+            panel.makeKeyAndOrderFront(nil)
+            panel.makeFirstResponder(content.editor.textView)
         }
     }
 
@@ -352,6 +419,13 @@ final class PanelController: NSObject, NSWindowDelegate {
             }
         }
     }
+}
+
+/// The destination shown in the panel header.
+struct PanelDestination {
+    var name: String
+    /// The full path, for a folder destination; its name then opens the folder picker (T17).
+    var folderPath: String?
 }
 
 private extension NSScreen {

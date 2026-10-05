@@ -19,6 +19,15 @@ public extension DestinationFactory {
 public extension DestinationConfig {
     static let defaultInboxName = "Otter Inbox"
 
+    /// The folder a folder destination saves to, as shown in the panel header's tooltip (T17).
+    /// `nil` for other kinds, whose name doesn't open the folder picker.
+    var folderDisplayPath: String? {
+        switch options {
+        case let .folder(options):
+            options.displayPath
+        }
+    }
+
     /// `~/Documents/Otter Inbox/`, one file per note. The folder is created on the first save.
     static func defaultInbox(documents: URL = .documentsDirectory) -> DestinationConfig {
         let folder = documents.appendingPathComponent(defaultInboxName, isDirectory: true)

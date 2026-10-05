@@ -224,3 +224,9 @@ private func fakeFactory(clock: TestClock = TestClock()) -> DestinationFactory {
     let decoded = try JSONDecoder().decode(FolderOptions.self, from: JSONEncoder().encode(options))
     #expect(decoded == options)
 }
+
+@Test func folderDestinationsExposeTheirDisplayPath() {
+    #expect(folder("Vault").folderDisplayPath == "~/Vault")
+    let inbox = DestinationConfig.defaultInbox(documents: URL(fileURLWithPath: "/Users/me/Documents"))
+    #expect(inbox.folderDisplayPath == "/Users/me/Documents/Otter Inbox")
+}

@@ -12,7 +12,13 @@ final class PanelContentView: NSVisualEffectView {
     let editor = EditorView(font: .systemFont(ofSize: 15), inset: PanelContentView.inset, placeholder: "Jot something down…")
 
     private let solidBackground = NSView()
-    private let destinationLabel = NSTextField(labelWithString: "")
+    private let destinationPill = DestinationPill()
+
+    /// Clicking a folder destination's name in the header (T17).
+    var onChooseFolder: (() -> Void)? {
+        get { destinationPill.onChooseFolder }
+        set { destinationPill.onChooseFolder = newValue }
+    }
 
     init() {
         super.init(frame: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
@@ -60,9 +66,10 @@ final class PanelContentView: NSVisualEffectView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// Call before showing: the default destination may have changed since last time.
-    func setDestinationName(_ name: String) {
-        destinationLabel.stringValue = name
+    /// Call before showing: the default destination may have changed since last time. `folderPath`
+    /// is `nil` unless it's a folder destination, whose name then opens the folder picker.
+    func setDestination(name: String, folderPath: String?) {
+        destinationPill.set(name: name, folderPath: folderPath)
     }
 
     /// Reduce Transparency swaps the vibrancy for a solid `windowBackgroundColor`.
@@ -86,26 +93,18 @@ final class PanelContentView: NSVisualEffectView {
     }
 
     /// The drag handle: a plain view, so a mouse-down on it moves the window. No separator below.
+    /// The destination pill moves it too, unless the press is a click on a folder's name.
     private func makeHeader() -> NSView {
         let header = NSView()
         header.translatesAutoresizingMaskIntoConstraints = false
 
-        destinationLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        destinationLabel.textColor = .secondaryLabelColor
-        destinationLabel.lineBreakMode = .byTruncatingTail
-        destinationLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let row = NSStackView(views: [DestinationDot(diameter: 8), destinationLabel])
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 6
-        row.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(row)
+        destinationPill.translatesAutoresizingMaskIntoConstraints = false
+        header.addSubview(destinationPill)
 
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: Self.inset),
-            row.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -Self.inset),
-            row.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+            destinationPill.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: Self.inset - DestinationPill.leadingPadding),
+            destinationPill.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor, constant: -Self.inset),
+            destinationPill.centerYAnchor.constraint(equalTo: header.centerYAnchor),
         ])
         return header
     }
@@ -149,31 +148,5 @@ final class PanelContentView: NSVisualEffectView {
             view.leadingAnchor.constraint(equalTo: leadingAnchor),
             view.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
-    }
-}
-
-/// The colored destination dot. Accent color until destinations carry their own (T10).
-private final class DestinationDot: NSView {
-    private let diameter: CGFloat
-
-    init(diameter: CGFloat) {
-        self.diameter = diameter
-        super.init(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
-        setContentHuggingPriority(.required, for: .horizontal)
-        setAccessibilityElement(false)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: diameter, height: diameter)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.controlAccentColor.setFill()
-        NSBezierPath(ovalIn: bounds).fill()
     }
 }

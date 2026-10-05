@@ -29,8 +29,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Built once here and only ordered in and out (ARCHITECTURE §6).
         let destinations = capturePipeline?.destinations
         let captureService = capturePipeline?.captureService
+        let folderChooser = capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
         let panel = PanelController(draftStore: DraftStore(fileURL: StorageLocations.draft)) {
-            destinations?.defaultID.flatMap { destinations?.config(for: $0)?.name } ?? "No destination"
+            guard let config = destinations?.defaultID.flatMap({ destinations?.config(for: $0) }) else {
+                return PanelDestination(name: "No destination")
+            }
+            return PanelDestination(name: config.name, folderPath: config.folderDisplayPath)
         } refreshDestination: {
             // A folder destination re-bookmarks a renamed folder here, which updates its name.
             guard let destination = destinations?.defaultID.flatMap({ destinations?.destination(for: $0) }) else {
@@ -39,6 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = await destination.healthCheck()
         } submit: { text in
             await captureService?.submit(text: text) ?? false
+        } chooseFolder: { window in
+            await folderChooser?.chooseFolder(above: window) ?? false
         }
         panelController = panel
 
@@ -56,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(
             hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
             panelController: panel,
-            folderChooser: capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
+            folderChooser: folderChooser
         )
     }
 
