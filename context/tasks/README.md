@@ -7,8 +7,9 @@ Each task is sized to be one focused PR (roughly half a day to a day and a half)
 | Milestone | Done when | Tasks |
 |---|---|---|
 | **M0 — Walking skeleton** | You can press the hotkey (`⌥Space` by default, or `⌘Space` once Spotlight is moved off it) anywhere, type, hit `⌘↩`, and the note lands in a folder you chose. Point it at your Obsidian vault and start dogfooding. | T01 → T02 → T03 → T15 → T04 → T05 → T06 |
-| **M1 — Integrations** | Obsidian daily-note append, Apple Notes, pasted images, save-clipboard hotkey, `⌘S` save-as, change the save folder from the panel header | T07, T08, T09, T11, T16, T17 |
+| **M1 — Integrations** | Obsidian vault awareness, pasted images, save-clipboard hotkey, `⌘S` save-as, change the save folder from the panel header | T07, T09, T11, T16, T17 |
 | **M2 — Ship it** | A stranger can download a notarized DMG, onboard in under a minute, and auto-update | T10, T12, T13, T14 |
+| **M3 — After v1** | Captures can go to Apple Notes, including onboarding, settings and the Recent menu (ADR-015) | T08 |
 
 ## Dependency graph
 
@@ -22,7 +23,9 @@ flowchart LR
   T05 --> T06[T06 Folder]
   T04 --> T06
   T06 --> T07[T07 Obsidian]
-  T05 --> T08[T08 Apple Notes]
+  T05 -.-> T08[T08 Apple Notes · after v1]
+  T10 -.-> T08
+  T14 -.-> T08
   T04 --> T09[T09 Paste + attachments]
   T06 --> T09
   T04 --> T16[T16 Save as ⌘S]
@@ -34,14 +37,15 @@ flowchart LR
   T06 --> T17[T17 Change folder from panel]
   T15 --> T17
   T17 --> T10
-  T08 --> T10
   T05 --> T12[T12 Menu bar + lifecycle]
   T10 --> T13[T13 Packaging]
   T12 --> T13
   T13 --> T14[T14 Perf + reliability]
 ```
 
-Parallelizable: after T05, **T08** (Apple Notes) can be built alongside T06/T07. **T11** can start as soon as T02 + T05 are in.
+Parallelizable: **T11** can start as soon as T02 + T05 are in.
+
+T08 (Apple Notes) is deferred to after v1 (ADR-015), and no M0–M2 task depends on it. Dotted edges show what it builds on once picked up: T05's pipeline, and T10/T14, whose Apple Notes parts it adds (see T08's "Picking this back up").
 
 ## Task file format
 

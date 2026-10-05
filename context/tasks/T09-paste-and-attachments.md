@@ -23,7 +23,7 @@
 4. Destination writing:
    - **Folder:** copy into `<folder>/<attachmentsFolder>/`, name `Pasted image yyyyMMddHHmmss.png` for clipboard images, original name for files (collision suffix). Append embeds at the end of the note body: `![](attachments/Pasted%20image%2020261002220713.png)` for images, `[spec.pdf](attachments/spec.pdf)` for files.
    - **Obsidian:** location from `attachmentFolderPath`, link style from `useMarkdownLinks` (T07 helpers). Wikilink form: `![[Pasted image 20261002220713.png]]`.
-   - **Apple Notes:** not supported (T08 behavior); footer warning shown when the selected destination can't take attachments.
+   - **Destinations that can't take attachments:** when the selected destination's `supportsAttachments` is `false`, the footer shows a warning before submit (UX_SPEC §1). Every v1 destination takes attachments, so build the check but there's no real destination to see it on until T08 adds Apple Notes.
 5. Limits: warn at > 25 MB per attachment, refuse > 200 MB; max 10 attachments per note.
 
 ## Implementation notes
@@ -40,7 +40,7 @@
 - [ ] Dragging a PDF from Finder attaches it.
 - [ ] Copying text from a web page pastes plain text, not an attachment.
 - [ ] Draft with an attachment survives `Esc` and app relaunch.
-- [ ] Apple Notes selected + image attached → footer warning visible before submit.
+- [ ] With a destination whose `supportsAttachments` is `false` (a test double), an attached image shows the footer warning before submit. T08 repeats this check with Apple Notes.
 - [ ] Unit tests: attachment naming, Obsidian attachment path resolution for `/`, `./`, `./assets`, `Assets/Images`.
 
 ## Out of scope

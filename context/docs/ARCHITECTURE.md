@@ -22,7 +22,7 @@ flowchart LR
     CS --> OB[(Outbox<br/>JSON journal)]
     OB --> DV[DeliveryService actor]
     DV --> FD[FolderDestination]
-    DV --> AN[AppleNotesDestination]
+    DV -.->|after v1| AN[AppleNotesDestination]
     DV --> RC[RecentStore]
   end
   FD --> FS[(Any folder,<br/>including one in an Obsidian vault)]
@@ -63,7 +63,7 @@ Otter/
 │   │                       FolderBookmark.swift, FolderRegistration.swift   # builder, default inbox (T06)
     │   ├── Destinations/Obsidian/ObsidianVault.swift, ObsidianVaultSettings.swift,   # vault lookup, app.json (T07)
     │   │                         ObsidianAttachmentPlacement.swift, ObsidianLink.swift, VaultDiscovery.swift
-    │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
+    │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift   # after v1 (T08)
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
     │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
@@ -104,14 +104,14 @@ public protocol Destination: Sendable {
 }
 
 public struct DeliveryReceipt: Codable, Sendable {
-    public var location: Location        // .file(URL) | .appleNote(id: String?)
+    public var location: Location        // .file(URL) | .appleNote(id: String?)  (.appleNote is unused until T08)
     public var deliveredAt: Date
 }
 ```
 
 A note in an Obsidian vault is still `.file(URL)`. Whether it's in a vault is worked out when it's opened (§5.2), so a folder that later moves into or out of a vault still opens the right way.
 
-`DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working. A refreshed bookmark (the folder was renamed) is saved back to the registry. With nothing configured, the registry holds the default inbox, `~/Documents/Otter Inbox/`, which has no bookmark until the first save creates the folder.
+`DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum. v1 has only `.folder(FolderOptions)`: an Obsidian vault is a folder (ADR-013), and T08 adds `.appleNotes(NotesOptions)` after v1 (ADR-015). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working. A refreshed bookmark (the folder was renamed) is saved back to the registry. With nothing configured, the registry holds the default inbox, `~/Documents/Otter Inbox/`, which has no bookmark until the first save creates the folder.
 
 ## 4. The capture pipeline
 
@@ -192,7 +192,9 @@ There's no Obsidian destination: a vault is just a folder (ADR-002, ADR-013). A 
 
 Obsidian does **not** need to be running. "Open in Obsidian" (`ObsidianLink.open`, used by T12's Recent menu) checks at open time whether the note is in a vault and something handles `obsidian://`, then opens `obsidian://open?vault=<name>&file=<vault-relative path without .md>`, with both values percent-encoded except `A–Z a–z 0–9 - . _ ~`. Otherwise it reveals the file in Finder.
 
-### 5.3 Apple Notes
+### 5.3 Apple Notes (after v1)
+
+Not in v1 (ADR-015). This is the design T08 builds in M3.
 
 - Executed out-of-process via `/usr/bin/osascript` (`Process`) on a background queue. Reasons: `NSAppleScript` is not safe off the main thread and Notes calls can block for seconds; a child process is attributed to Otter for TCC, so the prompt reads "Otter wants to control Notes".
 - **Note text is never interpolated into script source.** The script is a constant passed on stdin; values go in as `argv` (`on run argv`). This removes any script-injection risk from pasted content.
@@ -226,10 +228,10 @@ The panel is a sticky note, not a bar (ADR-012): it opens at a user-resizable si
 |---|---|---|---|
 | None for the hotkey | — | Carbon `RegisterEventHotKey` (via the KeyboardShortcuts package) needs no Accessibility permission | — |
 | Files & Folders (Documents, Desktop, iCloud Drive) | First write to a protected location; triggered during onboarding/Test | Folder & Obsidian destinations in protected locations | Health check → "Grant access" button re-opens folder picker |
-| Automation → Notes | First Apple Notes call; triggered by onboarding/Test | Apple Notes destination | `-1743` → guided fix |
+| Automation → Notes (after v1, T08) | First Apple Notes call; triggered by onboarding/Test | Apple Notes destination | `-1743` → guided fix |
 | Notifications | First delivery failure | Failure alerts | Badge-only if denied |
 
-Info.plist must include `NSAppleEventsUsageDescription`.
+Info.plist includes `NSAppleEventsUsageDescription` already, so T08 doesn't need an Info.plist change.
 
 ## 8. Storage
 
@@ -265,8 +267,8 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 ## 11. Testing strategy
 
-- **OtterCore unit tests** (fast, run in CI): file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping, outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
-- **Integration tests** (local only): Folder/Obsidian destinations against temp directories; Apple Notes behind an env flag because it needs TCC.
+- **OtterCore unit tests** (fast, run in CI): file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
+- **Integration tests** (local only): Folder/Obsidian destinations against temp directories; Apple Notes (T08, after v1) behind an env flag because it needs TCC.
 - **Manual test matrix** (T14): Spaces, full-screen apps, Stage Manager, multiple displays, IME input, Dark/Light, accessibility settings, iCloud Drive vaults.
 
 ## 12. Dependencies

@@ -23,7 +23,6 @@ Add/verify `os_signpost` intervals and record results in `context/docs/PERF.md` 
 | Hotkey → panel key | p95 < 100 ms (target 50) | |
 | `⌘↩` → panel hidden | < 50 ms | |
 | Enqueue → delivered (Folder/Obsidian) | p95 < 50 ms | |
-| Enqueue → delivered (Apple Notes, warm / cold) | < 1 s / < 4 s | |
 | Idle memory after 100 captures | < 40 MB | |
 | Idle wakeups/s (Activity Monitor) | ~0 | |
 
@@ -44,7 +43,7 @@ A debug-only test hook (`--otter-soak N`) that submits N synthetic captures (ran
 | Focus return | TextEdit, Safari address bar, Terminal, VS Code, Slack, a Java/Electron app — type immediately after `Esc` and after `⌘↩` |
 | Input | Japanese/Chinese IME; emoji picker (`⌃⌘Space`); dictation; RTL text; 1 MB paste |
 | Appearance | Light/Dark; Reduce Motion; Reduce Transparency; Increase Contrast; VoiceOver walkthrough |
-| Destinations | Vault in iCloud Drive with "Optimize Mac Storage" (file evicted); vault on external drive unplugged; folder renamed/deleted; disk full; Notes permission revoked mid-session; Notes iCloud account signed out |
+| Destinations | Vault in iCloud Drive with "Optimize Mac Storage" (file evicted); vault on external drive unplugged; folder renamed/deleted; disk full |
 | Time | Capture at 23:59, deliver after midnight; time zone change between capture and delivery; DST transition |
 | Lifecycle | Sleep/wake with pending outbox; logout/login; Sparkle update with pending outbox and an open draft |
 | Hotkeys | `⌘Space` with Spotlight enabled (falls back to `⌥Space`, reminder shown); Spotlight shortcut disabled while Otter is running (Otter picks up `⌘Space` without relaunch); Spotlight moved to `⌥Space` (no clash with fallback); `⌥Space` taken by another app; shortcut cleared; same key for both shortcuts (must be prevented) |

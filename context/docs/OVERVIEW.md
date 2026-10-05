@@ -19,13 +19,13 @@ These are the tie-breakers for every decision.
 1. **Capture, not organize.** Otter has one job: get text out of your head and into your notes system. Browsing, searching, editing, tagging and linking are your notes app's job.
 2. **It must feel instant.** Hotkey to typing in under 100 ms, every time. Saving never makes you wait — the panel closes the moment you hit `⌘↩`; delivery happens in the background.
 3. **Never lose a note.** Every keystroke is drafted to disk; every submitted note is journaled before the panel closes; failed deliveries retry until they succeed.
-4. **Your notes, your system.** Otter writes plain Markdown files or real Apple Notes. Uninstalling Otter leaves nothing stranded.
+4. **Your notes, your system.** Otter writes plain Markdown files (and, after v1, real Apple Notes). Uninstalling Otter leaves nothing stranded.
 5. **Free, local, private.** No account, no telemetry, no network calls. Ever, in v1.
 6. **Return focus.** Closing the panel must leave you exactly where you were, with the previous app still focused and typeable.
 
 ## 4. Who it's for
 
-- Primary: someone who lives in Obsidian or Apple Notes and wants a frictionless inbox.
+- Primary: someone who lives in Obsidian and wants a frictionless inbox. Apple Notes users follow after v1 (ADR-015).
 - Secondary: someone with no notes system who just wants "a folder of quick notes" they can grep later.
 - Not for: people who want a full notes app, sync service, or AI assistant.
 
@@ -39,9 +39,8 @@ These are the tie-breakers for every decision.
 - Destinations:
   - **Folder** — new file per note, or append to a single inbox file.
   - **Obsidian** — vault auto-discovery; append to today's daily note (default), append to an inbox note, or new note in a folder. Respects the vault's daily-note and attachment settings.
-  - **Apple Notes** — new note in a chosen account/folder (text only in v1).
 - Multiple destinations configured, one default, switch per note with `⌘1…⌘9`.
-- Paste images/files as attachments (Folder and Obsidian only).
+- Paste images/files as attachments.
 - Optional second hotkey: save clipboard instantly without opening the panel.
 - Outbox with background delivery, retry, and a visible failure state.
 - Recent captures list in the menu bar (click to open the note).
@@ -55,12 +54,13 @@ These are the tie-breakers for every decision.
 - AI features, tagging suggestions, link previews that fetch from the network.
 - Capturing the current selection from other apps (needs Accessibility permission; revisit post-v1).
 - Mac App Store distribution in v1 (see ADR-004).
+- Apple Notes in v1. It's planned for after the first release (T08, ADR-015).
 
 ## 6. Destinations at a glance
 
-The key insight: **an Obsidian vault is just a folder of Markdown files.** Obsidian watches the vault and picks up new or changed files immediately. So "Folder" and "Obsidian" share one writer; Obsidian adds vault-awareness on top (daily-note path, attachment folder, link style). Apple Notes is the only true app integration, and the most fragile one.
+The key insight: **an Obsidian vault is just a folder of Markdown files.** Obsidian watches the vault and picks up new or changed files immediately. So "Folder" and "Obsidian" share one writer; Obsidian adds vault-awareness on top (daily-note path, attachment folder, link style). Apple Notes is the only true app integration, and the most fragile one, so it comes after v1 (ADR-015).
 
-| | Folder | Obsidian | Apple Notes |
+| | Folder | Obsidian | Apple Notes (after v1) |
 |---|---|---|---|
 | Mechanism | Write `.md` files | Write `.md` files into the vault | Apple Events (AppleScript via `osascript`) |
 | Needs Obsidian/Notes running | — | No | Launched automatically in the background |
@@ -88,8 +88,9 @@ The key insight: **an Obsidian vault is just a folder of Markdown files.** Obsid
 | Milestone | Outcome | Tasks | Rough effort (solo + coding agent) |
 |---|---|---|---|
 | **M0 — Walking skeleton** | Usable daily: hotkey → panel → saves to a folder you pick | T01–T06 | 4–6 days |
-| **M1 — Integrations** | Obsidian daily notes, Apple Notes, paste images, clipboard hotkey | T07, T08, T09, T11 | 4–6 days |
+| **M1 — Integrations** | Obsidian vault awareness, paste images, clipboard hotkey, save-as, change folder from the panel | T07, T09, T11, T16, T17 | 4–6 days |
 | **M2 — Ship it** | Onboarding, settings, menu bar polish, notarized DMG with auto-update | T10, T12, T13, T14 | 4–6 days |
+| **M3 — After v1** | Apple Notes destination | T08 | 2–4 days |
 
 Point a folder destination at your Obsidian vault after M0 and you're already dogfooding the core loop.
 
@@ -97,7 +98,7 @@ Point a folder destination at your Obsidian vault after M0 and you're already do
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Apple Notes scripting is slow or breaks in a macOS update | Medium | Async outbox hides latency; clear error + "Test connection"; Folder fallback always available |
+| Apple Notes scripting is slow or breaks in a macOS update | Medium | Deferred to M3 (ADR-015), so it can't hold up v1. Then: async outbox hides latency; clear error + "Test connection"; Folder fallback always available |
 | `⌘Space` (opt-in) is owned by Spotlight until the user moves it | Certain | `⌥Space` default (ADR-011); guided handoff in onboarding (ADR-010), `⌥Space` fallback, persistent "finish setup" reminder |
 | Default `⌥Space` already taken by ChatGPT/Raycast | Medium | Configurable; press-to-confirm check in onboarding |
 | Obsidian config formats change (daily notes, Periodic Notes plugin) | Medium | Parse defensively; fall back to defaults; let the user override folder/format manually |

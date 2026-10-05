@@ -34,7 +34,7 @@ Clicking the folder name in the panel header opens a folder picker, and the fold
 
 - Keep `FolderChooser` in `App/MenuBar/` and pass it into `PanelController` from `AppDelegate`. Its `chooseFolder(above:)` is `async` and returns whether the folder changed, so the panel learns when the picker closes.
 - `chooseFolder(bookmark:displayPath:name:)` changes the *default* folder destination. The header shows the default until T10 adds per-note switching with `⌘1…⌘9`. Once it does, the header acts on the destination it shows: give `chooseFolder` a destination ID instead of always using the default.
-- If the header's destination isn't a folder destination (Obsidian in T07, Apple Notes in T08), the name isn't clickable until T10 turns it into the destination menu.
+- If the header's destination isn't a folder destination (Apple Notes, after v1 in T08), the name isn't clickable until T10 turns it into the destination menu.
 - The panel reads `destinationName()` on show. After a successful choice, set the name again directly rather than waiting for the next show.
 - Run the picker with `begin(completionHandler:)`, not `runModal()`, so the capture panel's fade and Space-switch logic keep running. Don't attach it as a sheet: the panel is too small for it and sheets on a non-activating panel misbehave.
 - No note text in logs. Log only that the folder changed, as `FolderChooser` does now.

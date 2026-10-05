@@ -30,7 +30,7 @@
    | Folder · new file per note | `{date} {time} {title-from-first-line}.md` (T06) | `{title}.md`, cleaned up by `FileNamer`'s character rules, collision suffix ` 2`, ` 3`… |
    | Folder / Obsidian · append (incl. daily note) | Append template as now | Append template gets `{{title}}`. Default multi-line block heading becomes `### {{time}} {{title}}`; a single-line named note renders as a multi-line block so the name shows |
    | Obsidian · new note in folder | Same as Folder | Same as Folder |
-   | Apple Notes | First line is the Notes title | `title` is sent as the first `<div>` (bold), body follows |
+   | Apple Notes (T08, after v1) | First line is the Notes title | `title` is sent as the first `<div>` (bold), body follows |
 5. Add `{{title}}` to `AppendTemplate` and `MarkdownWriter`, and add a `title` frontmatter field on new files when named.
 6. Footer hint: `⌘↩ Save · ⌘S Save as…` (T15 puts both in the footer).
 
@@ -50,7 +50,7 @@
 - [x] `⌘S` then `Esc`: back in the editor with the text untouched, nothing saved.
 - [x] `⌘S` on an empty panel does nothing.
 - [ ] Obsidian daily note: a named capture appends under `### HH:mm Groceries`.
-- [ ] Apple Notes: a named capture creates a note titled "Groceries".
+- [ ] ~~Apple Notes: a named capture creates a note titled "Groceries".~~ Moved to T08 (ADR-015).
 - [ ] Previous app never activates and Otter never shows in `⌘⇥` during the flow.
 - [ ] Unit tests: `Capture` decodes old JSON without `title`; `FileNamer` titles (illegal characters, empty after cleanup, collisions); `MarkdownWriter` with `{{title}}`; default-name formatting across time zones.
 

@@ -66,7 +66,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 ### Footer
 
 - **Destination pill** (in the header): colored dot + destination name. For a folder destination the name is the folder's name, its tooltip is the full path, and it highlights on hover. Clicking it (or `⇧⌘O`) opens a folder picker over the panel; the folder chosen becomes where notes are saved from then on, and the text being typed stays as it is (T17). `⌘1…⌘9` switches destination for *this note only*; the default comes back on the next open.
-- **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an inline warning when relevant, e.g. "Apple Notes can't take images yet — they'll be dropped."
+- **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an inline warning when relevant, e.g. when the destination can't take attachments ("Apple Notes can't take images yet — they'll be dropped." once T08 adds Apple Notes).
 - **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the destination pill. Click → menu with Retry / Show details.
 
 ### States
@@ -128,7 +128,7 @@ Settings…                             ⌘,
 Quit Otter                              ⌘Q
 ```
 
-Clicking a recent item opens it where it lives: reveal in Finder (Folder), `obsidian://open` (Obsidian), or activates Notes (Apple Notes).
+Clicking a recent item opens it where it lives: reveal in Finder (Folder) or `obsidian://open` (Obsidian). After v1, Apple Notes items activate Notes (T08).
 
 ## 5. Settings (one window, three tabs)
 
@@ -142,7 +142,7 @@ Clicking a recent item opens it where it lives: reveal in Finder (Folder), `obsi
 
 **Destinations**
 - List of destinations with drag-to-reorder (order = `⌘1…⌘9`), star = default
-- Add: Obsidian vault (detected vaults listed) · Apple Notes · Folder
+- Add: Obsidian vault (detected vaults listed) · Folder. Apple Notes joins this menu after v1 (T08).
 - Per-destination options (mode, target file/folder, template, frontmatter) and a **Test** button that writes a test note and reports success/failure
 
 **Advanced**
@@ -155,7 +155,7 @@ Clicking a recent item opens it where it lives: reveal in Finder (Folder), `obsi
 Shown once, in the Settings window, three steps:
 
 1. **Your hotkey.** Recommended: `⌥Space`, already active. "Use ⌘Space instead" starts the Spotlight handoff: if Spotlight still owns `⌘Space`, the step explains this in one sentence and shows an **Open Keyboard Shortcuts** button (System Settings › Keyboard › Keyboard Shortcuts › Spotlight) with "Uncheck *Show Spotlight search*, or change it to ⌥Space." The step re-checks when Otter regains focus and turns green once `⌘Space` is free; then it asks the user to press `⌘Space` once to confirm. "Use a different shortcut" opens the recorder; "Skip for now" keeps `⌥Space`. Either way, the step asks the user to press the shortcut once to confirm it reaches Otter (`⌥Space` may be taken by another app).
-2. **Where should notes go?** Detected Obsidian vaults listed first, then Apple Notes, then "A folder…". One choice; sensible defaults for the rest (Obsidian → daily note append; Notes → "Otter" folder in the default account; Folder → new file per note). Picking Apple Notes immediately runs a test so the Automation prompt appears now, not mid-capture.
+2. **Where should notes go?** Detected Obsidian vaults listed first, then "A folder…". One choice; sensible defaults for the rest (a vault or folder → new file per note, ADR-013). After v1, T08 adds Apple Notes between the two ("Otter" folder in the default account), and picking it runs a test right away so the Automation prompt appears now, not mid-capture.
 3. **Try it.** "Press ⌥Space, type anything, hit ⌘↩." (shows whichever hotkey step 1 ended on) The step completes itself when the first capture is delivered and shows where it went, with an "Open" button.
 
 Launch at login is offered on the last step (default on).

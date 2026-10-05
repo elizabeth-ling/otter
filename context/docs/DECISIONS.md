@@ -31,7 +31,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-003 · Apple Notes via AppleScript run with `osascript`, treated as best-effort
+## ADR-003 · Apple Notes via AppleScript run with `osascript`, treated as best-effort — **Deferred to after v1 by ADR-015**
 
 **Context.** Apple Notes has no public API for third-party writes on macOS. The options are Apple Events (AppleScript/JXA) or Shortcuts.
 
@@ -162,3 +162,16 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - Showing the Save panel activates Otter. The panel stays up while it's open, and the next hide hands activation back to the app the user came from, as for T17's folder picker.
 
 **Consequences.** Notes can be saved anywhere, not only in the destination's folder. A name that's taken gets the Save panel's "Replace?" prompt rather than a ` 2` suffix. Otter is briefly the active app (it has no Dock icon, so it still doesn't show in `⌘⇥`). A future non-folder default destination (T08's Apple Notes) has to handle or refuse captures that carry a `fileURL`.
+
+---
+
+## ADR-015 · v1 ships without Apple Notes; T08 moves after the first release
+
+**Context.** Folder and Obsidian share one writer: put a `.md` file on disk. Apple Notes is the only destination that drives another app (ADR-003). It brings an Automation (TCC) prompt and denial recovery into onboarding, `osascript` timeouts and stderr error codes, a possible Hardened Runtime entitlement, and a scripting dictionary that can change in any macOS release and can't be tested in CI. It also reaches into other tasks: T09's attachment warning, T10's pickers, Test button and onboarding step, and T16's named notes and `fileURL` captures. The developer dogfoods with Obsidian, so it would be built without daily use.
+
+**Decision.**
+- v1 (M0–M2) ships with Folder and Obsidian only. T08 moves to **M3 — After v1**, together with the Apple Notes parts of other tasks, which T08 now lists under "Picking this back up".
+- Nothing in M1/M2 depends on T08. Those tasks don't build Apple Notes UI, scripts or permission flows.
+- Keep the seams that cost nothing: `Destination.supportsAttachments`, `DestinationHealth.needsPermission`, `DeliveryReceipt.Location.appleNote`, the factory's per-kind builders and `NSAppleEventsUsageDescription`. ADR-003's approach stands for when T08 is built.
+
+**Consequences.** The primary user (OVERVIEW §4) is someone who lives in Obsidian; Apple Notes users get the Folder destination until M3. Onboarding is simpler: step 2 picks a vault or a folder, with no permission prompt beyond Files & Folders. ADR-004's App Store concern about Apple Events no longer applies to v1, though the Obsidian-config reason for staying unsandboxed still does.

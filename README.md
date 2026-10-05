@@ -2,7 +2,7 @@
 
  otter is a FOS macOS menu-bar utility for capturing notes. what quick notes should've been. press a hotkey from anywhere, a small floating panel appears, type, hit `⌘↩`, and the note is filed into the notes system of your choice
 
- currently, there is support for Obsidian and Apple Notes
+ currently, there is support for Obsidian and plain folders. Apple Notes is planned for after the first release
 
 Otter is NOT a notes app.
 No account. No backend. Your data stays on your Mac by default.
@@ -32,7 +32,7 @@ No account. No backend. Your data stays on your Mac by default.
 | T05 | [Capture pipeline and outbox](context/tasks/T05-capture-pipeline-outbox.md) | M0 |
 | T06 | [Folder destination](context/tasks/T06-folder-destination.md) | M0 |
 | T07 | [Obsidian destination](context/tasks/T07-obsidian-destination.md) | M1 |
-| T08 | [Apple Notes destination](context/tasks/T08-apple-notes-destination.md) | M1 |
+| T08 | [Apple Notes destination](context/tasks/T08-apple-notes-destination.md) | M3 (after v1) |
 | T09 | [Paste handling and attachments](context/tasks/T09-paste-and-attachments.md) | M1 |
 | T10 | [Settings and first-run onboarding](context/tasks/T10-settings-and-onboarding.md) | M2 |
 | T11 | [Save-clipboard hotkey and HUD](context/tasks/T11-clipboard-capture-hud.md) | M1 |

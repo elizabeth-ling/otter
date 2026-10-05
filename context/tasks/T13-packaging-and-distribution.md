@@ -19,7 +19,7 @@ A stranger can download a DMG (or `brew install --cask`), open it without Gateke
 
 ## Scope
 
-1. Signing: Developer ID Application, hardened runtime, secure timestamp. Entitlements: none beyond hardened runtime defaults (Apple Events need `NSAppleEventsUsageDescription` only, since we're not sandboxed).
+1. Signing: Developer ID Application, hardened runtime, secure timestamp. Entitlements: none beyond hardened runtime defaults. v1 sends no Apple Events (ADR-015); T08 checks later whether Notes needs the `apple-events` entitlement.
 2. Release script `scripts/release.sh` (and a GitHub Actions workflow triggered by a `v*` tag):
    1. `xcodebuild archive` → `-exportArchive` with `method = developer-id`
    2. `ditto -c -k --keepParent` → `xcrun notarytool submit --wait` (App Store Connect API key in CI secrets)
@@ -29,7 +29,7 @@ A stranger can download a DMG (or `brew install --cask`), open it without Gateke
 3. **Sparkle 2**: add via SPM; `SUFeedURL` pointing at an `appcast.xml` on GitHub Pages/Releases; EdDSA keys (`generate_keys`), public key in Info.plist, private key in CI secrets; `generate_appcast` in the release workflow. "Check for Updates…" menu item; "Automatically check for updates" toggle in Settings › Advanced (default on; this is Otter's only network access — say so).
 4. GitHub Release with DMG + release notes from `CHANGELOG.md`.
 5. Homebrew: start with your own tap (`homebrew-tap/Casks/otter.rb`); submit to `homebrew/cask` once there are a few releases and some users.
-6. README: install instructions, permissions explained (why Notes automation, why folder access), privacy statement (no telemetry, no network except update checks).
+6. README: install instructions, permissions explained (why folder access; T08 adds Notes automation later), privacy statement (no telemetry, no network except update checks).
 
 ## Implementation notes
 
