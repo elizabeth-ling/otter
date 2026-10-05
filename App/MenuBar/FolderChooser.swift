@@ -92,10 +92,9 @@ final class FolderChooser: NSObject {
         return true
     }
 
-    // MARK: - Private
-
-    /// Where the default folder destination points now, so the panel opens there.
-    private func currentFolder() -> URL? {
+    /// Where the default folder destination points now, so the folder picker and the `⌘S` Save
+    /// panel (T16) open there. The default inbox's parent until the first save creates it.
+    func currentFolder() -> URL? {
         guard let id = destinations.defaultID, case let .folder(options)? = destinations.config(for: id)?.options else {
             return nil
         }

@@ -41,10 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             _ = await destination.healthCheck()
-        } submit: { text in
-            await captureService?.submit(text: text) ?? false
+        } submit: { text, file in
+            await captureService?.submit(text: text, saveAs: file) ?? false
         } chooseFolder: { window in
             await folderChooser?.chooseFolder(above: window) ?? false
+        } chooseSaveFile: { window, defaultName in
+            await SaveAsPrompt.chooseFile(above: window, in: folderChooser?.currentFolder(), defaultName: defaultName)
         }
         panelController = panel
 

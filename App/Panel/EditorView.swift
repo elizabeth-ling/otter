@@ -12,6 +12,8 @@ enum EditorCommand {
     case openSettings
     /// `⇧⌘O`: change the save folder, as clicking the folder name in the header does (T17).
     case chooseFolder
+    /// `⌘S`: save the note under a name and in a folder picked in the Save panel (T16).
+    case saveAs
 }
 
 /// The panel's plain-text editor (T04, ADR-007): an `NSTextView` in a scroll view that fills the text
@@ -174,7 +176,8 @@ final class EditorTextView: NSTextView {
             onCommand?(.chooseFolder)
             return true
         case (.command, "s"):
-            // Reserved for Save as (T16). Swallowed so it never reaches `saveDocument:`.
+            // Handled here so it never reaches `saveDocument:`.
+            onCommand?(.saveAs)
             return true
         default:
             break

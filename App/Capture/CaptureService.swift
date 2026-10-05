@@ -23,11 +23,15 @@ final class CaptureService {
     }
 
     /// Journals the note and starts delivering it.
-    /// - Parameter destinationID: The destination picked for this note (`⌘1…⌘9`). `nil` means the default.
+    /// - Parameters:
+    ///   - file: The file chosen in the `⌘S` Save panel (T16), whose name becomes the note's title.
+    ///     `nil` for an unnamed note, which the destination names.
+    ///   - destinationID: The destination picked for this note (`⌘1…⌘9`). `nil` means the default.
     /// - Returns: `true` once the note is safe in the outbox.
     @discardableResult
     func submit(
         text: String,
+        saveAs file: URL? = nil,
         attachments: [StagedAttachment] = [],
         destinationID: DestinationID? = nil,
         source: Capture.Source = .panel
@@ -38,7 +42,14 @@ final class CaptureService {
             return false
         }
 
-        let capture = Capture(text: text, attachments: attachments.map(\.attachment), destinationID: destinationID, source: source)
+        let capture = Capture(
+            text: text,
+            title: file?.deletingPathExtension().lastPathComponent,
+            fileURL: file,
+            attachments: attachments.map(\.attachment),
+            destinationID: destinationID,
+            source: source
+        )
         do {
             try await outbox.enqueue(capture, attachmentFiles: attachments.map(\.file))
         } catch {

@@ -3,12 +3,12 @@ import OtterCore
 import os
 
 /// Shows, hides and positions the capture panel (T03, T15), and runs its editor: the keyboard map,
-/// submitting and the saved draft (T04). The panel is built once here and only ordered in and out,
+/// submitting, the saved draft (T04) and saving under a name with `⌘S` (T16). The panel is built once here and only ordered in and out,
 /// so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
 ///
 /// Never calls `NSApp.activate` itself: the panel is non-activating, so the app the user came from
-/// stays active and gets keyboard focus back on hide. The folder picker (T17) is the exception; see
-/// `appToReactivate`.
+/// stays active and gets keyboard focus back on hide. The folder picker (T17) and the Save panel (T16)
+/// are the exceptions; see `appToReactivate`.
 @MainActor
 final class PanelController: NSObject, NSWindowDelegate {
     static let fadeDuration: TimeInterval = 0.08
@@ -22,8 +22,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let draftStore: DraftStore
     private let destination: @MainActor () -> PanelDestination
     private let refreshDestination: @MainActor () async -> Void
-    private let submitNote: @MainActor (_ text: String) async -> Bool
+    private let submitNote: @MainActor (_ text: String, _ file: URL?) async -> Bool
     private let pickFolder: (@MainActor (_ above: NSWindow) async -> Bool)?
+    private let pickSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)?
 
     /// What the header shows now.
     private var shownDestination: PanelDestination?
@@ -45,10 +46,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var lastResignKeyAt: TimeInterval?
     private var lastSpaceChangeAt: TimeInterval?
     private var spaceChangeObserver: (any NSObjectProtocol)?
-    /// The folder picker is open. It takes key, which mustn't hide the panel.
-    private var isChoosingFolder = false
-    /// The app that was frontmost before the folder picker activated Otter. It's activated again
-    /// when the panel hides, so focus lands where it would have without the picker.
+    /// The folder picker or the Save panel is open. It takes key, which mustn't hide the panel.
+    private var isShowingDialog = false
+    /// The app that was frontmost before the folder picker or the Save panel activated Otter. It's
+    /// activated again when the panel hides, so focus lands where it would have without them.
     private var appToReactivate: NSRunningApplication?
 
     private var isShown: Bool { panel.isVisible && !isHiding }
@@ -57,15 +58,19 @@ final class PanelController: NSObject, NSWindowDelegate {
     ///   - destination: The destination the header shows.
     ///   - refreshDestination: Checks the default destination, so a renamed folder's new name is
     ///     saved before `destination` is read again.
-    ///   - submit: Puts the note in the outbox. Returns `true` once it's safe there.
+    ///   - submit: Puts the note in the outbox, to be written to the file chosen in the Save panel if
+    ///     there is one. Returns `true` once it's safe there.
     ///   - chooseFolder: Shows the folder picker above the panel. Returns `true` if the folder changed.
+    ///   - chooseSaveFile: Shows the Save panel above the panel, offering `defaultName`.
+    ///     Returns the file chosen, or `nil` for Cancel.
     init(
         defaults: UserDefaults = .standard,
         draftStore: DraftStore,
         destination: @escaping @MainActor () -> PanelDestination,
         refreshDestination: @escaping @MainActor () async -> Void = {},
-        submit: @escaping @MainActor (_ text: String) async -> Bool,
-        chooseFolder: (@MainActor (_ above: NSWindow) async -> Bool)? = nil
+        submit: @escaping @MainActor (_ text: String, _ file: URL?) async -> Bool,
+        chooseFolder: (@MainActor (_ above: NSWindow) async -> Bool)? = nil,
+        chooseSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)? = nil
     ) {
         frameStore = PanelFrameStore(defaults: defaults)
         self.draftStore = draftStore
@@ -73,6 +78,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         self.refreshDestination = refreshDestination
         submitNote = submit
         pickFolder = chooseFolder
+        pickSaveFile = chooseSaveFile
         panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
 
@@ -110,6 +116,11 @@ final class PanelController: NSObject, NSWindowDelegate {
             beginVisibleSignpost()
             show()
         case .makeKey:
+            guard !isShowingDialog else {
+                // The dialog has key; bring it back rather than taking key from it.
+                NSApp.activate()
+                return
+            }
             beginVisibleSignpost()
             panel.makeKeyAndOrderFront(nil)
             focusEditor()
@@ -210,7 +221,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Clicking elsewhere closes the panel. Switching Spaces doesn't, although it also takes key.
     func windowDidResignKey(_ notification: Notification) {
         // Not shown: an `Esc` or hotkey hide is ordering it out.
-        guard !keepOpenWhenClickingElsewhere, isShown, !isChoosingFolder else {
+        guard !keepOpenWhenClickingElsewhere, isShown, !isShowingDialog else {
             return
         }
         let now = ProcessInfo.processInfo.systemUptime
@@ -300,6 +311,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             Logger.panel.info("Settings requested; they arrive with T10")
         case .chooseFolder:
             chooseFolder()
+        case .saveAs:
+            saveAs()
         }
     }
 
@@ -309,30 +322,52 @@ final class PanelController: NSObject, NSWindowDelegate {
         content.setDestination(name: destination.name, folderPath: destination.folderPath)
     }
 
-    /// The header's folder name or `⇧⌘O` (T17). The panel stays up while the picker is open and is
-    /// key again afterwards, with the text, selection and caret as they were.
+    /// The header's folder name or `⇧⌘O` (T17).
     private func chooseFolder() {
         guard let pickFolder, isShown, shownDestination?.folderPath != nil else {
             NSSound.beep()
             return
         }
-        guard !isChoosingFolder else {
-            // The picker hides while Otter is inactive; this brings it back.
+        showDialog { [self] in
+            if await pickFolder(panel) {
+                updateDestination()
+            }
+        }
+    }
+
+    /// `⌘S`: the Save panel, offering the date and time it opened. Save keeps the panel open for the
+    /// next note; Cancel goes back to the text as it was. Nothing to save just beeps.
+    private func saveAs() {
+        guard let pickSaveFile, isShown, !isNoteEmpty else {
+            NSSound.beep()
+            return
+        }
+        let defaultName = FileNamer.defaultTitle(for: Date(), in: .current)
+        showDialog { [self] in
+            if let file = await pickSaveFile(panel, defaultName) {
+                submit(closeAfter: false, saveAs: file)
+            }
+        }
+    }
+
+    /// Runs a dialog that activates Otter: the folder picker (T17) or the Save panel (T16). The panel
+    /// stays up while it's open and is key again afterwards, with the text, selection and caret as
+    /// they were.
+    private func showDialog(_ run: @escaping @MainActor () async -> Void) {
+        guard !isShowingDialog else {
+            // The dialog hides while Otter is inactive; this brings it back.
             NSApp.activate()
             return
         }
-        isChoosingFolder = true
+        isShowingDialog = true
         if !NSApp.isActive, let frontmost = NSWorkspace.shared.frontmostApplication,
            frontmost.processIdentifier != NSRunningApplication.current.processIdentifier {
             appToReactivate = frontmost
         }
 
         Task {
-            let changed = await pickFolder(panel)
-            isChoosingFolder = false
-            if changed {
-                updateDestination()
-            }
+            await run()
+            isShowingDialog = false
             guard isShown else {
                 return
             }
@@ -341,14 +376,18 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// `⌘↩` and `⇧⌘↩`. The draft is cleared only once the outbox has the note; if it doesn't, the
-    /// panel stays open with the text.
-    private func submit(closeAfter: Bool) {
+    private var isNoteEmpty: Bool {
+        content.editor.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// `⌘↩`, `⇧⌘↩` and Save in the `⌘S` Save panel (with `file`). The draft is cleared only once the
+    /// outbox has the note; if it doesn't, the panel stays open with the text.
+    private func submit(closeAfter: Bool, saveAs file: URL? = nil) {
         guard !isSubmitting else {
             return
         }
         let text = content.editor.text
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !isNoteEmpty else {
             if closeAfter {
                 hide()
             }
@@ -357,7 +396,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         isSubmitting = true
         Task {
-            let saved = await submitNote(text)
+            let saved = await submitNote(text, file)
             isSubmitting = false
             guard saved else {
                 return
