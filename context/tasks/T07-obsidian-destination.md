@@ -49,11 +49,11 @@ No daily notes. Tasks often span several days, so filing captures by date isn't 
 
 ## Acceptance criteria
 
-- [ ] Unit tests: `containing` finds the vault from the root, from a deep subfolder and for a nested vault, and returns `nil` outside any vault and for a `.obsidian` file.
-- [ ] Unit tests: settings parsing for every fixture, including the defaults when parsing fails.
-- [ ] Unit tests: attachment directory and embed text for each `attachmentFolderPath` form × both link styles, with names containing spaces and `#`.
-- [ ] Unit tests: `openURL` encoding (spaces, `/`, `&`, emoji, `.md` stripped).
-- [ ] Unit tests: `VaultDiscovery` sorts newest first and skips missing paths. A missing or malformed `obsidian.json` returns `[]`.
+- [x] Unit tests: `containing` finds the vault from the root, from a deep subfolder and for a nested vault, and returns `nil` outside any vault and for a `.obsidian` file.
+- [x] Unit tests: settings parsing for every fixture, including the defaults when parsing fails.
+- [x] Unit tests: attachment directory and embed text for each `attachmentFolderPath` form × both link styles, with names containing spaces and `#`.
+- [x] Unit tests: `openURL` encoding (spaces, `/`, `&`, emoji, `.md` stripped).
+- [x] Unit tests: `VaultDiscovery` sorts newest first and skips missing paths. A missing or malformed `obsidian.json` returns `[]`.
 - [ ] Manual: "Use Obsidian Vault ▸" lists your vaults with the one opened most recently first. Choosing one and saving a note puts a new file in the vault root, and it appears in Obsidian within a second.
 - [ ] Manual: change the folder from the header to a subfolder of the vault. The next note lands there.
 - [ ] Manual: `ObsidianLink.open` on a delivered note (via a debug menu item or a test hook) opens that exact note in Obsidian. With Obsidian closed, it launches Obsidian on that note.

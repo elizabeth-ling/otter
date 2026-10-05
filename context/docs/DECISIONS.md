@@ -16,7 +16,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-002 · Files are the integration layer; Obsidian = folder + vault awareness
+## ADR-002 · Files are the integration layer; Obsidian = folder + vault awareness — **Daily notes dropped by ADR-013**
 
 **Context.** The brief: don't build another notes app; plug into Obsidian or Apple Notes, fall back to a folder.
 
@@ -135,3 +135,17 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - The non-activating focus behavior from ADR-001 is unchanged.
 
 **Consequences.** T04 loses its auto-height work; T15 replaces T03's layout and placement. A remembered position can be far from the pointer on a large display, which is the trade-off the user asked for; "Reset Panel Position" undoes it.
+
+---
+
+## ADR-013 · No daily notes; an Obsidian vault is a folder destination (amends ADR-002)
+
+**Context.** The original plan had a separate Obsidian destination that appended each capture to the vault's daily note, located through `.obsidian/daily-notes.json` with its Moment.js filename format. But tasks often span several days, so filing captures by date isn't useful.
+
+**Decision.**
+- Drop daily notes. No Periodic Notes or note templates either.
+- No Obsidian destination kind. A vault is a folder: any folder destination inside a vault (found by walking up to a `.obsidian/` directory) follows the vault's attachment folder and link style from `app.json`, and its notes open in Obsidian.
+- Receipts stay `.file(URL)`. Whether a note is in a vault is decided when it's opened, not stored.
+- Anyone who wants one running file uses T06's append mode.
+
+**Consequences.** ADR-002's consequences no longer include `daily-notes.json`: the only Obsidian files Otter reads are `app.json` and `obsidian.json`, and it needs no `MomentFormat`. Picking a vault (T10's Add menu, onboarding) just sets a folder destination to the vault root, and the user can pick a subfolder from the panel header. Other specs that still mention daily notes (OVERVIEW, UX_SPEC, T09, T11, T12, T16, the tasks README) are updated separately.

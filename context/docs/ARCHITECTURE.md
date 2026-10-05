@@ -22,12 +22,10 @@ flowchart LR
     CS --> OB[(Outbox<br/>JSON journal)]
     OB --> DV[DeliveryService actor]
     DV --> FD[FolderDestination]
-    DV --> OD[ObsidianDestination]
     DV --> AN[AppleNotesDestination]
     DV --> RC[RecentStore]
   end
-  FD --> FS[(Any folder)]
-  OD --> V[(Obsidian vault)]
+  FD --> FS[(Any folder,<br/>including one in an Obsidian vault)]
   AN -->|osascript / Apple Events| N[Notes.app]
 ```
 
@@ -49,6 +47,8 @@ Otter/
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
 │   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10; also opened from the panel header (T17)
+│   │          ObsidianVaultMenu.swift   # "Use Obsidian Vault ▸" until T10 (T07)
+│   │          ObsidianLink+Open.swift   # open a note in Obsidian, or reveal it in Finder (T07)
 │   ├── Settings/…                # SwiftUI views
 │   ├── Onboarding/…
 │   └── Resources/Info.plist, Assets.xcassets
@@ -60,8 +60,8 @@ Otter/
     │   ├── Destinations/Destination.swift, DestinationRegistry.swift
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift,
 │   │                       FolderBookmark.swift, FolderRegistration.swift   # builder, default inbox (T06)
-    │   ├── Destinations/Obsidian/ObsidianDestination.swift, VaultDiscovery.swift,
-    │   │                         DailyNoteResolver.swift, MomentFormat.swift
+    │   ├── Destinations/Obsidian/ObsidianVault.swift, ObsidianVaultSettings.swift,   # vault lookup, app.json (T07)
+    │   │                         ObsidianAttachmentPlacement.swift, ObsidianLink.swift, VaultDiscovery.swift
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
@@ -102,10 +102,12 @@ public protocol Destination: Sendable {
 }
 
 public struct DeliveryReceipt: Codable, Sendable {
-    public var location: Location        // .file(URL) | .obsidian(vault: String, path: String) | .appleNote(id: String?)
+    public var location: Location        // .file(URL) | .appleNote(id: String?)
     public var deliveredAt: Date
 }
 ```
+
+A note in an Obsidian vault is still `.file(URL)`. Whether it's in a vault is worked out when it's opened (§5.2), so a folder that later moves into or out of a vault still opens the right way.
 
 `DestinationConfig` is a Codable struct: an `id`, a display `name`, and an `options` enum (`.folder(FolderOptions)`, `.obsidian(ObsidianOptions)`, `.appleNotes(NotesOptions)`). `DestinationRegistry` persists the list, in `⌘1…⌘9` order, and the default ID in `UserDefaults` as JSON. It builds each `Destination` through a factory where each kind registers a builder. Folder locations are stored as **bookmark data**, not paths, so moved/renamed folders keep working. A refreshed bookmark (the folder was renamed) is saved back to the registry. With nothing configured, the registry holds the default inbox, `~/Documents/Otter Inbox/`, which has no bookmark until the first save creates the folder.
 
@@ -173,18 +175,19 @@ Implemented as a tiny hand-rolled renderer (`{{time}}`, `{{date}}`, `{{text}}`, 
 
 ### 5.2 Obsidian
 
-Built on the Folder writer plus vault-awareness:
+There's no Obsidian destination: a vault is just a folder (ADR-002, ADR-013). A folder destination anywhere inside a vault picks up the vault's conventions, and each capture is still its own note in the folder the user chose. Daily notes aren't supported; T06's append mode covers one running file.
+
+**Vault detection.** `ObsidianVault.containing(url)` walks up from the folder (itself included) to the first ancestor with a `.obsidian/` directory; with nested vaults the nearest wins, and a `.obsidian` *file* doesn't count. The lookup is a few `stat` calls and is never cached, so a folder moved into or out of a vault is followed.
 
 | Need | Source of truth |
 |---|---|
-| List of vaults | `~/Library/Application Support/obsidian/obsidian.json` → `vaults[*].path` |
-| Daily note folder, filename format, template | `<vault>/.obsidian/daily-notes.json` (`folder`, `format` in Moment.js tokens, `template`) |
-| Attachment folder | `<vault>/.obsidian/app.json` → `attachmentFolderPath` (`/` = vault root, `./` = same folder as note, `./sub` = subfolder of note's folder, otherwise a vault-relative path) |
-| Link style | `<vault>/.obsidian/app.json` → `useMarkdownLinks` (`![[x.png]]` vs `![](x.png)`) |
+| List of vaults | `~/Library/Application Support/obsidian/obsidian.json` → `vaults{id: {path, ts}}` (`VaultDiscovery`, newest first, skipping missing paths and folders without `.obsidian/`) |
+| Attachment folder | `<vault>/.obsidian/app.json` → `attachmentFolderPath` (`/` = vault root, `./` = same folder as note, `./sub` = subfolder of note's folder, otherwise a vault-relative path; `..` and absolute paths fall back to the root). Overrides `FolderOptions.attachmentsFolder` inside a vault. |
+| Link style | `<vault>/.obsidian/app.json` → `useMarkdownLinks` (`![[x.png]]` vs `![](x.png)`) and `newLinkFormat` (`shortest`, `relative`, `absolute`) |
 
-All parsing is defensive: missing or malformed files fall back to Obsidian's defaults (root folder, `YYYY-MM-DD`, attachments at vault root, wikilinks), and every derived value can be overridden in settings. Moment.js tokens are translated to `DateFormatter` patterns by `MomentFormat` (supported subset documented in T07; unsupported tokens → fall back to `YYYY-MM-DD` and warn in settings).
+`app.json` is read at each delivery (it's tiny), so changes made in Obsidian apply without a relaunch. Missing or malformed files, and keys of the wrong type, fall back to Obsidian's defaults: attachments at the vault root, wikilinks, `shortest`. `ObsidianAttachmentPlacement` turns these into the directory to copy into and the embed text; T09 wires it in. Markdown links are relative to the note and percent-encoded. A file name with `# ^ [ ] |` can't be a wikilink target, so it gets a Markdown link even in a wikilink vault. Otter never writes inside `.obsidian/`.
 
-Obsidian does **not** need to be running. "Open in Obsidian" uses `obsidian://open?vault=<name>&file=<vault-relative path>`.
+Obsidian does **not** need to be running. "Open in Obsidian" (`ObsidianLink.open`, used by T12's Recent menu) checks at open time whether the note is in a vault and something handles `obsidian://`, then opens `obsidian://open?vault=<name>&file=<vault-relative path without .md>`, with both values percent-encoded except `A–Z a–z 0–9 - . _ ~`. Otherwise it reveals the file in Finder.
 
 ### 5.3 Apple Notes
 
