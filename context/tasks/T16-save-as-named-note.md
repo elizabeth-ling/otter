@@ -45,10 +45,10 @@
 
 ## Acceptance criteria
 
-- [ ] Type a note, `⌘S`, `↩`: a file named like `2026-10-03 2051.md` appears in the folder destination; the panel stays open, empty, caret in the editor.
-- [ ] Type a note, `⌘S`, type "Groceries", `↩`: `Groceries.md` appears. Doing it again gives `Groceries 2.md`.
-- [ ] `⌘S` then `Esc`: back in the editor with the text untouched, nothing saved.
-- [ ] `⌘S` on an empty panel does nothing.
+- [x] Type a note, `⌘S`, `↩`: a file named like `2026-10-03 2051.md` appears in the folder destination; the panel stays open, empty, caret in the editor.
+- [x] Type a note, `⌘S`, type "Groceries", `↩`: `Groceries.md` appears. Doing it again gives error.
+- [x] `⌘S` then `Esc`: back in the editor with the text untouched, nothing saved.
+- [x] `⌘S` on an empty panel does nothing.
 - [ ] Obsidian daily note: a named capture appends under `### HH:mm Groceries`.
 - [ ] Apple Notes: a named capture creates a note titled "Groceries".
 - [ ] Previous app never activates and Otter never shows in `⌘⇥` during the flow.
