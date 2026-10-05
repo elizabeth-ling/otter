@@ -116,6 +116,17 @@ func baseNameNeverLeavesTheFolder(text: String) {
     #expect(FileNamer.fileName(base: "Note", number: 3) == "Note 3.md")
 }
 
+// MARK: - The Save panel's name (T16)
+
+@Test func defaultTitleIsTheDateAndTimeInTheGivenTimeZone() {
+    // referenceDate is 2026-09-21 14:13:20 UTC.
+    #expect(FileNamer.defaultTitle(for: referenceDate, in: paris) == "2026-09-21 1613")
+    #expect(FileNamer.defaultTitle(for: referenceDate, in: TimeZone(identifier: "UTC")!) == "2026-09-21 1413")
+    #expect(FileNamer.defaultTitle(for: referenceDate, in: TimeZone(identifier: "America/Los_Angeles")!) == "2026-09-21 0713")
+    #expect(FileNamer.defaultTitle(for: referenceDate, in: TimeZone(identifier: "Pacific/Kiritimati")!) == "2026-09-22 0413")
+    #expect(FileNamer.defaultTitle(for: referenceDate, in: TimeZone(identifier: "Asia/Kolkata")!) == "2026-09-21 1943")
+}
+
 // MARK: - Paths from settings
 
 @Test func safeRelativePathAcceptsPathsInsideTheFolder() {

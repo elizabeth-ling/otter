@@ -83,6 +83,54 @@ private func isSameDirectory(_ a: URL, _ b: URL) -> Bool {
     #expect(try contents(of: folder) == ["2026-09-21 1613 Standup 2.md", "2026-09-21 1613 Standup 3.md", "2026-09-21 1613 Standup.md"])
 }
 
+// MARK: - Save panel (T16)
+
+@Test func savePanelNoteIsWrittenToTheChosenFileWithATitle() async throws {
+    let root = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = try makeFolder(in: root)
+    let elsewhere = try makeFolder(in: root, named: "Elsewhere")
+    let chosen = elsewhere.appendingPathComponent("Groceries.md")
+    let destination = try makeDestination(folder: folder, mode: .appendToFile(name: "Inbox"))
+
+    let capture = makeCapture("oat milk\nbread", title: "Groceries", fileURL: chosen, destination: destination.id)
+    let file = try fileURL(of: await destination.deliver(capture, files: noFiles))
+
+    #expect(file == chosen)
+    #expect(try String(contentsOf: chosen, encoding: .utf8) == "---\ntitle: \"Groceries\"\ncreated: 2026-09-21T16:13:20+02:00\nsource: otter\n---\noat milk\nbread\n")
+    #expect(try contents(of: elsewhere) == ["Groceries.md"])
+    #expect(try contents(of: folder).isEmpty)
+}
+
+@Test func savePanelNoteReplacesTheChosenFile() async throws {
+    let root = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = try makeFolder(in: root)
+    let chosen = folder.appendingPathComponent("Groceries.md")
+    try Data("old".utf8).write(to: chosen)
+    let destination = try makeDestination(folder: folder, frontmatter: false)
+
+    for _ in 1...2 {
+        _ = try await destination.deliver(makeCapture("new", title: "Groceries", fileURL: chosen, destination: destination.id), files: noFiles)
+    }
+
+    #expect(try String(contentsOf: chosen, encoding: .utf8) == "new\n")
+    #expect(try contents(of: folder) == ["Groceries.md"])
+}
+
+@Test func savePanelNoteInAMissingFolderFailsAndLeavesNothing() async throws {
+    let root = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = try makeFolder(in: root)
+    let destination = try makeDestination(folder: folder)
+    let chosen = root.appendingPathComponent("Gone/Groceries.md")
+
+    await #expect(throws: (any Error).self) {
+        try await destination.deliver(makeCapture(title: "Groceries", fileURL: chosen, destination: destination.id), files: noFiles)
+    }
+    #expect(try contents(of: root) == ["Notes"])
+}
+
 @Test func subfolderIsCreatedOnFirstWrite() async throws {
     let root = try makeTemporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }

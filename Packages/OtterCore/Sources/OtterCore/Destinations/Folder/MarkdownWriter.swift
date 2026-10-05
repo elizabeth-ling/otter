@@ -3,12 +3,17 @@ import Foundation
 /// Renders what a folder destination writes (ARCHITECTURE §5.1). Pure: no disk access. Output uses
 /// `\n` line endings only; callers encode it as UTF-8 without a BOM.
 public enum MarkdownWriter {
-    /// A new note file: optional frontmatter, then the text, ending with one newline.
-    public static func newFile(text: String, createdAt: Date, timeZone: TimeZone, frontmatter: Bool) -> String {
+    /// A new note file: optional frontmatter, then the text, ending with one newline. A note named
+    /// with `⌘S` gets a `title` field in its frontmatter.
+    public static func newFile(text: String, title: String? = nil, createdAt: Date, timeZone: TimeZone, frontmatter: Bool) -> String {
         var output = ""
         if frontmatter {
             let created = FileNamer.format(createdAt, "yyyy-MM-dd'T'HH:mm:ssxxxxx", in: timeZone)
-            output += "---\ncreated: \(created)\nsource: otter\n---\n"
+            output += "---\n"
+            if let title {
+                output += "title: \(yamlQuoted(title))\n"
+            }
+            output += "created: \(created)\nsource: otter\n---\n"
         }
         return output + body(text) + "\n"
     }
@@ -66,6 +71,22 @@ public enum MarkdownWriter {
             return lines[0].trimmingCharacters(in: .whitespaces)
         }
         return String(lines.joined(separator: "\n").reversed().drop(while: \.isWhitespace).reversed())
+    }
+
+    /// A YAML double-quoted scalar on one line. Control characters, newlines included, become spaces.
+    private static func yamlQuoted(_ text: String) -> String {
+        var quoted = "\""
+        for character in text {
+            switch character {
+            case "\\", "\"":
+                quoted += "\\\(character)"
+            case _ where character.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }):
+                quoted += " "
+            default:
+                quoted.append(character)
+            }
+        }
+        return quoted + "\""
     }
 
     private static func normalizedLineEndings(_ text: String) -> String {

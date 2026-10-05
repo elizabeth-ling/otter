@@ -36,6 +36,20 @@ private let paris = TimeZone(identifier: "Europe/Paris")!
     #expect(String(data: data, encoding: .utf8) == "Café 🎉\n")
 }
 
+@Test func namedNewFileHasATitleInTheFrontmatter() {
+    let content = MarkdownWriter.newFile(text: "oat milk", title: "Groceries", createdAt: referenceDate, timeZone: paris, frontmatter: true)
+    #expect(content == "---\ntitle: \"Groceries\"\ncreated: 2026-09-21T16:13:20+02:00\nsource: otter\n---\noat milk\n")
+}
+
+@Test func frontmatterTitleIsQuotedAndStaysOnOneLine() {
+    let content = MarkdownWriter.newFile(text: "x", title: #"Q4: "plan" \ #1"# + "\nnext\u{07}", createdAt: referenceDate, timeZone: paris, frontmatter: true)
+    #expect(content.hasPrefix(#"---"# + "\n" + #"title: "Q4: \"plan\" \\ #1 next ""# + "\ncreated: "))
+}
+
+@Test func namedNoteWithoutFrontmatterIsJustTheText() {
+    #expect(MarkdownWriter.newFile(text: "oat milk", title: "Groceries", createdAt: referenceDate, timeZone: paris, frontmatter: false) == "oat milk\n")
+}
+
 // MARK: - Append blocks
 
 @Test func defaultTemplateRendersAOneLineNoteAsAListItem() {

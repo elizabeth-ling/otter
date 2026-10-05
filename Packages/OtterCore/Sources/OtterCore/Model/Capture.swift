@@ -14,6 +14,12 @@ public struct Capture: Codable, Identifiable, Sendable, Equatable {
     /// local time rather than the time zone in effect when it's delivered.
     public let timeZoneIdentifier: String
     public var text: String
+    /// The name given with `⌘S` save-as (T16). `nil` for an unnamed note: every `⌘↩`/`⇧⌘↩` save and
+    /// every clipboard save. Outbox entries written before this field existed decode as `nil`.
+    public var title: String?
+    /// The file chosen in the `⌘S` Save panel (T16), written as it is, replacing a file already
+    /// there (the Save panel asked first). `nil` lets the destination name the file.
+    public var fileURL: URL?
     public var attachments: [Attachment]
     public var destinationID: DestinationID
     public var source: Source
@@ -23,6 +29,8 @@ public struct Capture: Codable, Identifiable, Sendable, Equatable {
         createdAt: Date = Date(),
         timeZone: TimeZone = .current,
         text: String,
+        title: String? = nil,
+        fileURL: URL? = nil,
         attachments: [Attachment] = [],
         destinationID: DestinationID,
         source: Source
@@ -31,6 +39,8 @@ public struct Capture: Codable, Identifiable, Sendable, Equatable {
         self.createdAt = createdAt
         timeZoneIdentifier = timeZone.identifier
         self.text = text
+        self.title = title
+        self.fileURL = fileURL
         self.attachments = attachments
         self.destinationID = destinationID
         self.source = source

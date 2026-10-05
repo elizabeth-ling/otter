@@ -23,6 +23,8 @@ public enum FolderDestinationError: Error, LocalizedError, Equatable {
 ///
 /// - New files are written to a hidden temp file in the target directory, then renamed into place,
 ///   so a watcher like Obsidian never sees a half-written note.
+/// - A note saved with the `⌘S` Save panel (T16) goes to the file the user chose, wherever it is,
+///   whatever the mode; that path comes from the Save panel, never from the note's text.
 /// - Appends are coordinated (`NSFileCoordinator`, `.forMerging`), which keeps iCloud Drive and
 ///   other coordinated writers in step.
 /// - The folder is found through its bookmark, so a rename in Finder is followed. A folder in the
@@ -79,6 +81,11 @@ public actor FolderDestination: Destination {
     }
 
     public func deliver(_ capture: Capture, files: URL) async throws -> DeliveryReceipt {
+        if let file = capture.fileURL {
+            try writeChosenFile(file, for: capture)
+            Logger.folder.info("Wrote \(capture.id, privacy: .public) to the file chosen for it")
+            return DeliveryReceipt(location: .file(file), deliveredAt: Date())
+        }
         let directory = try targetDirectory(in: locateFolder(creatingIfNeeded: true))
         let file: URL
         switch options.mode {
@@ -165,14 +172,8 @@ public actor FolderDestination: Destination {
 
     private func writeNewFile(for capture: Capture, in directory: URL) throws -> URL {
         let base = FileNamer.baseName(template: options.filenameTemplate, text: capture.text, date: capture.createdAt, timeZone: capture.timeZone)
-        let content = MarkdownWriter.newFile(text: capture.text, createdAt: capture.createdAt, timeZone: capture.timeZone, frontmatter: options.frontmatter)
-
-        let temporary = directory.appendingPathComponent(".\(UUID().uuidString).tmp")
-        try Data(content.utf8).write(to: temporary)
+        let temporary = try writeTemporaryFile(for: capture, in: directory)
         defer { try? FileManager.default.removeItem(at: temporary) }
-        let handle = try FileHandle(forWritingTo: temporary)
-        try handle.synchronize()
-        try handle.close()
 
         var number = 1
         while true {
@@ -187,6 +188,39 @@ public actor FolderDestination: Destination {
             }
             number += 1
         }
+    }
+
+    /// The Save panel's file, replaced in one step if it exists, so a retry after a crash rewrites the
+    /// same file rather than adding another.
+    private func writeChosenFile(_ file: URL, for capture: Capture) throws {
+        let temporary = try writeTemporaryFile(for: capture, in: file.deletingLastPathComponent())
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        // `rename(2)` replaces an existing file atomically; `moveItem` would refuse.
+        guard rename(temporary.path, file.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
+    /// The note's Markdown in a hidden temp file in `directory`, synced to disk, for renaming into place.
+    private func writeTemporaryFile(for capture: Capture, in directory: URL) throws -> URL {
+        let content = MarkdownWriter.newFile(
+            text: capture.text,
+            title: capture.title,
+            createdAt: capture.createdAt,
+            timeZone: capture.timeZone,
+            frontmatter: options.frontmatter
+        )
+        let temporary = directory.appendingPathComponent(".\(UUID().uuidString).tmp")
+        try Data(content.utf8).write(to: temporary)
+        do {
+            let handle = try FileHandle(forWritingTo: temporary)
+            try handle.synchronize()
+            try handle.close()
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+        return temporary
     }
 
     private func append(_ capture: Capture, toFileNamed name: String, in directory: URL) throws -> URL {

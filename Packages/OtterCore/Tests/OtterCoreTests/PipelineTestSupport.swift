@@ -17,6 +17,8 @@ func makeTemporaryDirectory() throws -> URL {
 
 func makeCapture(
     _ text: String = "Buy oat milk",
+    title: String? = nil,
+    fileURL: URL? = nil,
     destination: DestinationID,
     createdAt: Date = referenceDate,
     attachments: [Attachment] = []
@@ -25,6 +27,8 @@ func makeCapture(
         createdAt: createdAt,
         timeZone: TimeZone(identifier: "Europe/Paris")!,
         text: text,
+        title: title,
+        fileURL: fileURL,
         attachments: attachments,
         destinationID: destination,
         source: .panel

@@ -43,6 +43,12 @@ public enum FileNamer {
         return name.isEmpty ? fallbackTitle : name
     }
 
+    /// The name the `⌘S` Save panel offers (T16): `yyyy-MM-dd HHmm` in `timeZone`, which matches the
+    /// default `{date} {time}` and is safe as a file name.
+    public static func defaultTitle(for date: Date, in timeZone: TimeZone) -> String {
+        format(date, "yyyy-MM-dd HHmm", in: timeZone)
+    }
+
     /// The name to try for the `number`th file with this base: `base.md`, then on collisions
     /// `base 2.md`, `base 3.md`….
     public static func fileName(base: String, number: Int, pathExtension: String = "md") -> String {
