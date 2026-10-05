@@ -62,7 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItemController = StatusItemController(
             hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
             panelController: panel,
-            folderChooser: folderChooser
+            folderChooser: folderChooser,
+            recents: capturePipeline?.recents
         )
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Somewhere a capture can be delivered: a folder, an Obsidian vault, Apple Notes (ARCHITECTURE §3, §5).
+/// Somewhere a capture can be delivered: a folder (which may sit in an Obsidian vault) or Apple Notes
+/// (ARCHITECTURE §3, §5).
 public protocol Destination: Sendable {
     var id: DestinationID { get }
     var displayName: String { get }
@@ -18,11 +19,12 @@ public enum DestinationHealth: Sendable, Equatable {
     case unreachable(String)
 }
 
-/// Where a delivered capture ended up, for the Recent menu and "open the note".
+/// Where a delivered capture ended up, for the Recent menu and "open the note". A file in an
+/// Obsidian vault is still `.file`: whether it's in a vault is worked out when it's opened
+/// (`ObsidianLink.open`), so a folder moved into or out of a vault later still opens correctly.
 public struct DeliveryReceipt: Codable, Sendable, Equatable {
     public enum Location: Codable, Sendable, Equatable {
         case file(URL)
-        case obsidian(vault: String, path: String)
         case appleNote(id: String?)
     }
 

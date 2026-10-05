@@ -65,9 +65,10 @@ final class FolderChooser: NSObject {
         return use(folder)
     }
 
-    // MARK: - Private
-
-    private func use(_ folder: URL) -> Bool {
+    /// Points the default folder destination at `folder`, as Choose does. Also used by "Use Obsidian
+    /// Vault ▸" (T07), so a vault is just another folder.
+    @discardableResult
+    func use(_ folder: URL) -> Bool {
         let bookmark: Data
         do {
             bookmark = try FolderBookmark.make(for: folder)
@@ -90,6 +91,8 @@ final class FolderChooser: NSObject {
         }
         return true
     }
+
+    // MARK: - Private
 
     /// Where the default folder destination points now, so the panel opens there.
     private func currentFolder() -> URL? {

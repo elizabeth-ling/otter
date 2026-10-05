@@ -3,7 +3,7 @@ import Testing
 @testable import OtterCore
 
 private func receipt(_ seconds: TimeInterval) -> DeliveryReceipt {
-    DeliveryReceipt(location: .obsidian(vault: "Notes", path: "Daily/2026-09-21.md"), deliveredAt: referenceDate + seconds)
+    DeliveryReceipt(location: .file(URL(fileURLWithPath: "/Notes/Inbox/2026-09-21 0900 Note.md")), deliveredAt: referenceDate + seconds)
 }
 
 @Test func keepsTheLastTwentyNewestFirstAndPersists() async throws {
@@ -14,7 +14,7 @@ private func receipt(_ seconds: TimeInterval) -> DeliveryReceipt {
     let captures = (1...25).map { makeCapture("Note \($0)", destination: DestinationID()) }
 
     for (index, capture) in captures.enumerated() {
-        await store.record(capture, receipt: receipt(TimeInterval(index)), destinationName: "Daily note")
+        await store.record(capture, receipt: receipt(TimeInterval(index)), destinationName: "Notes")
     }
 
     let expected = captures.suffix(20).reversed().map(\.id)

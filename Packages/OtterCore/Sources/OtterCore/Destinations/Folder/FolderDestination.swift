@@ -18,7 +18,8 @@ public enum FolderDestinationError: Error, LocalizedError, Equatable {
 }
 
 /// Writes captures as Markdown into a folder (ARCHITECTURE §5.1): one new file per note, or a block
-/// appended to one file. The Obsidian destination builds on it (T07).
+/// appended to one file. A folder inside an Obsidian vault is still written here; `ObsidianVault`
+/// and its helpers supply the vault's conventions (T07).
 ///
 /// - New files are written to a hidden temp file in the target directory, then renamed into place,
 ///   so a watcher like Obsidian never sees a half-written note.

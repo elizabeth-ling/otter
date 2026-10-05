@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// Builds a concrete `Destination` from its config, one builder per kind. T06 registers `.folder`;
-/// T07 and T08 register their own kinds.
+/// T08 registers Apple Notes. An Obsidian vault is a folder, so it has no kind of its own (T07).
 public struct DestinationFactory: Sendable {
     public typealias Builder = @Sendable (DestinationConfig) -> (any Destination)?
 

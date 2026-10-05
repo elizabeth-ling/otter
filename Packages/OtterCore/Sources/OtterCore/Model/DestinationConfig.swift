@@ -22,7 +22,8 @@ public struct DestinationID: Hashable, Codable, Sendable, CustomStringConvertibl
     }
 }
 
-/// The kinds of destination Otter can build. T07 adds Obsidian, T08 adds Apple Notes.
+/// The kinds of destination Otter can build. T08 adds Apple Notes. An Obsidian vault is a folder
+/// destination (T07).
 public enum DestinationKind: String, Codable, Sendable, CaseIterable {
     case folder
 }

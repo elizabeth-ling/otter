@@ -1,0 +1,9 @@
+{
+  "vaults": {
+    "a1b2c3d4e5f60708": { "path": "{ROOT}/Notes", "ts": 1759000000000, "open": true },
+    "1122334455667788": { "path": "{ROOT}/Notes/Archive", "ts": 1759500000000 },
+    "99aabbccddeeff00": { "path": "{ROOT}/Gone", "ts": 1759900000000 },
+    "0f0e0d0c0b0a0908": { "path": "{ROOT}/NotAVault", "ts": 1759800000000 }
+  },
+  "frame": { "x": 100, "y": 100, "width": 1024, "height": 800 }
+}

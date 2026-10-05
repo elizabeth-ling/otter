@@ -1,4 +1,5 @@
 import AppKit
+import OtterCore
 
 /// Owns the menu bar item. AppKit `NSStatusItem` rather than SwiftUI `MenuBarExtra`
 /// because T12 needs a badge state and a dynamic menu.
@@ -8,11 +9,15 @@ final class StatusItemController {
     private let hotkeyWindowController: HotkeyWindowController
     private let panelController: PanelController
     private let folderChooser: FolderChooser?
+    private let vaultMenu: ObsidianVaultMenu?
+    private let recents: RecentStore?
 
-    init(hotkeyWindowController: HotkeyWindowController, panelController: PanelController, folderChooser: FolderChooser?) {
+    init(hotkeyWindowController: HotkeyWindowController, panelController: PanelController, folderChooser: FolderChooser?, recents: RecentStore?) {
         self.hotkeyWindowController = hotkeyWindowController
         self.panelController = panelController
         self.folderChooser = folderChooser
+        vaultMenu = folderChooser.map(ObsidianVaultMenu.init(folderChooser:))
+        self.recents = recents
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         let image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: "Otter")
@@ -25,6 +30,17 @@ final class StatusItemController {
             let folderItem = menu.addItem(withTitle: "Choose Folder…", action: #selector(FolderChooser.chooseFolder(_:)), keyEquivalent: "")
             folderItem.target = folderChooser
         }
+        if let vaultMenu {
+            let vaultItem = menu.addItem(withTitle: "Use Obsidian Vault", action: nil, keyEquivalent: "")
+            vaultItem.submenu = vaultMenu.menu
+        }
+        #if DEBUG
+        // Until the Recent menu lands (T12): checks `ObsidianLink.open` by hand (T07).
+        if recents != nil {
+            let openItem = menu.addItem(withTitle: "Open Last Note (Debug)", action: #selector(openLastNote(_:)), keyEquivalent: "")
+            openItem.target = self
+        }
+        #endif
         // Temporary until Settings lands (T10).
         let hotkeyItem = menu.addItem(withTitle: "Hotkey…", action: #selector(NSWindowController.showWindow(_:)), keyEquivalent: "")
         hotkeyItem.target = hotkeyWindowController
@@ -35,4 +51,16 @@ final class StatusItemController {
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
     }
+
+    #if DEBUG
+    @objc private func openLastNote(_ sender: Any?) {
+        Task { [recents] in
+            guard case let .file(url)? = await recents?.recent().first?.location else {
+                NSSound.beep()
+                return
+            }
+            ObsidianLink.open(url)
+        }
+    }
+    #endif
 }
