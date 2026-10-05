@@ -40,13 +40,15 @@ A small sticky-note panel floating above everything (reference: `context/ui/box-
 **Save as (`⌘S`)**
 
 ```
-│  ──────────────────────────────────  │
-│  Save as [2026-10-03 2051        ]   │  ← pre-filled, selected
-│                  ↩ Save · Esc Cancel │
-╰──────────────────────────────────────╯
+   ╭─────────────────────────────────────╮  ← the native Save panel, in its own
+   │ Save As: [2026-10-03 2051         ] │     window in the middle of the screen
+   │ Tags:    [                        ] │
+   │ Where:   [ Otter Inbox          ▾ ] │
+   │                [Cancel]  [ Save ]   │
+   ╰─────────────────────────────────────╯
 ```
 
-The `●` in the header is the destination dot (colored per destination), next to the destination name. The footer is always shown. `⌘S` slides a "Save as" row in above the footer, pre-filled with the save's date and time; `↩` saves under that name and clears the panel for a new note, `Esc` goes back to the text (T16).
+The `●` in the header is the destination dot (colored per destination), next to the destination name. The footer is always shown. `⌘S` opens the native Save panel in its own window, centred on the screen the panel is on and above it. The name is pre-filled with the date and time and selected, and the folder starts at the destination's folder. Save writes the note to that file (`.md`), names it after the file, and clears the panel for a new note; Cancel or `Esc` goes back to the text (T16, ADR-014).
 
 | Property | Value |
 |---|---|
@@ -85,7 +87,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | *unset (suggest `⌥⇧Space`)* | Global | Save clipboard as a note instantly, show HUD |
 | `⌘↩` | Panel | Save and close |
 | `⇧⌘↩` | Panel | Save and keep open (cleared, ready for the next note) |
-| `⌘S` | Panel | Save as: name the note (defaults to the save's date and time), save it, keep the panel open for a new note |
+| `⌘S` | Panel | Save as: the native Save panel picks the name (defaults to the date and time) and folder; save it there, keep the panel open for a new note |
 | `Esc` | Panel | Close. Draft is kept and restored next time |
 | `⇧⌘⌫` | Panel | Discard draft (and attachments) |
 | `⌘1` … `⌘9` | Panel | Choose destination for this note |

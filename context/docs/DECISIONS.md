@@ -149,3 +149,16 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - Anyone who wants one running file uses T06's append mode.
 
 **Consequences.** ADR-002's consequences no longer include `daily-notes.json`: the only Obsidian files Otter reads are `app.json` and `obsidian.json`, and it needs no `MomentFormat`. Picking a vault (T10's Add menu, onboarding) just sets a folder destination to the vault root, and the user can pick a subfolder from the panel header. Other specs that still mention daily notes (OVERVIEW, UX_SPEC, T09, T11, T12, T16, the tasks README) are updated separately.
+
+---
+
+## ADR-014 · `⌘S` uses the native Save panel
+
+**Context.** T16 specified an inline "Save as" row inside the panel, so naming a note never activated Otter. In use the product owner wants the real macOS Save As: a separate window in the middle of the screen, with its folder browser.
+
+**Decision.**
+- `⌘S` shows `NSSavePanel` as its own window, centred on the capture panel's screen and above it (the capture panel floats), not as a sheet. It offers `yyyy-MM-dd HHmm` as the name and starts in the default folder destination's folder; the file is Markdown (`.md`).
+- The Save panel only picks the file. The note still goes through the outbox (ADR-005): the capture carries `fileURL` and its `title` (the file name), and the folder destination writes exactly that file, replacing one that's there since the Save panel asked first. The destination's mode, subfolder and filename template don't apply; its frontmatter setting does, plus a `title` field.
+- Showing the Save panel activates Otter. The panel stays up while it's open, and the next hide hands activation back to the app the user came from, as for T17's folder picker.
+
+**Consequences.** Notes can be saved anywhere, not only in the destination's folder. A name that's taken gets the Save panel's "Replace?" prompt rather than a ` 2` suffix. Otter is briefly the active app (it has no Dock icon, so it still doesn't show in `⌘⇥`). A future non-folder default destination (T08's Apple Notes) has to handle or refuse captures that carry a `fileURL`.

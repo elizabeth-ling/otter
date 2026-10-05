@@ -43,6 +43,7 @@ Otter/
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)
 │   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
+│   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
 │   ├── Panel/AttachmentChips.swift
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
@@ -80,6 +81,7 @@ public struct Capture: Codable, Identifiable, Sendable {
     public let timeZoneIdentifier: String // TimeZone.current at capture time; delivery formats createdAt in it
     public var text: String
     public var title: String?           // set by ⌘S save-as (T16); nil = unnamed
+    public var fileURL: URL?            // the file chosen in the ⌘S Save panel (T16); nil = destination names it
     public var attachments: [Attachment]
     public var destinationID: DestinationID
     public var source: Source           // .panel | .clipboard
@@ -155,9 +157,10 @@ sequenceDiagram
 
 ### 5.1 Folder
 
-- **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`, or `{title}.md` when the user named the note with `⌘S` (T16; same character rules). For unnamed notes, `title` = first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
+- **Saved with `⌘S`** (T16, ADR-014): written to exactly the file chosen in the Save panel, in any folder and whatever the mode, replacing a file already there (the Save panel confirmed it). Atomic, like new files; a retry rewrites the same file.
+- **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`, where `title` = the first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
 - **Append to file**: creates the file if missing; ensures a trailing newline; appends a block rendered from a template (default below), with one blank line between blocks. `{{time}}` is `HH:mm`.
-- Optional YAML frontmatter on new files: `created` (ISO 8601 with offset), `source: otter`.
+- Optional YAML frontmatter on new files: `title` (double-quoted, named captures only), `created` (ISO 8601 with offset), `source: otter`.
 - A folder that was deleted (including one sitting in the Trash, where its bookmark still resolves) is "Folder missing": captures stay in the outbox until it's recreated where it was or another folder is chosen. Only the default inbox is recreated automatically.
 - **Writes are atomic for new files** (temp file in the same directory + rename) and **coordinated for appends** (`NSFileCoordinator` with `.forMerging`, then `FileHandle.seekToEnd()` + write + `synchronize()`), which keeps iCloud Drive and Obsidian's file watcher happy.
 
@@ -171,7 +174,7 @@ Default append template:
 {{/multi_line}}
 ```
 
-Implemented as a tiny hand-rolled renderer (`{{time}}`, `{{date}}`, `{{text}}`, `{{title}}`, `{{attachments}}`, two conditional sections). A named capture (T16) always uses the multi-line block, with `### {{time}} {{title}}` as its heading. No templating dependency.
+Implemented as a tiny hand-rolled renderer (`{{time}}`, `{{date}}`, `{{text}}`, `{{title}}`, `{{attachments}}`, two conditional sections). No templating dependency.
 
 ### 5.2 Obsidian
 
