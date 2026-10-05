@@ -30,19 +30,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let destinations = capturePipeline?.destinations
         let captureService = capturePipeline?.captureService
         let folderChooser = capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
-        let panel = PanelController(draftStore: DraftStore(fileURL: StorageLocations.draft)) {
+        let panel = PanelController(
+            draftStore: DraftStore(fileURL: StorageLocations.draft),
+            attachmentStager: AttachmentStager(directory: StorageLocations.draftFiles)
+        ) {
             guard let config = destinations?.defaultID.flatMap({ destinations?.config(for: $0) }) else {
                 return PanelDestination(name: "No destination")
             }
-            return PanelDestination(name: config.name, folderPath: config.folderDisplayPath)
+            return PanelDestination(name: config.name, folderPath: config.folderDisplayPath, supportsAttachments: config.kind.supportsAttachments)
         } refreshDestination: {
             // A folder destination re-bookmarks a renamed folder here, which updates its name.
             guard let destination = destinations?.defaultID.flatMap({ destinations?.destination(for: $0) }) else {
                 return
             }
             _ = await destination.healthCheck()
-        } submit: { text, file in
-            await captureService?.submit(text: text, saveAs: file) ?? false
+        } submit: { text, file, attachments in
+            await captureService?.submit(text: text, saveAs: file, attachments: attachments) ?? false
         } chooseFolder: { window in
             await folderChooser?.chooseFolder(above: window) ?? false
         } chooseSaveFile: { window, defaultName in

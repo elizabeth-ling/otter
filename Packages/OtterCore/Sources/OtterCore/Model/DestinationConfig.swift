@@ -26,6 +26,15 @@ public struct DestinationID: Hashable, Codable, Sendable, CustomStringConvertibl
 /// destination (T07).
 public enum DestinationKind: String, Codable, Sendable, CaseIterable {
     case folder
+
+    /// Whether this kind's destinations keep attachments. The panel reads it from the config, so it
+    /// can warn before submit without building the destination (T09).
+    public var supportsAttachments: Bool {
+        switch self {
+        case .folder:
+            true
+        }
+    }
 }
 
 /// One configured destination as the user set it up, persisted in `UserDefaults` by

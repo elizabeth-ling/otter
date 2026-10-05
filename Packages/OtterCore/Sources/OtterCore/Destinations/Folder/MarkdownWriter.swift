@@ -4,8 +4,16 @@ import Foundation
 /// `\n` line endings only; callers encode it as UTF-8 without a BOM.
 public enum MarkdownWriter {
     /// A new note file: optional frontmatter, then the text, ending with one newline. A note named
-    /// with `⌘S` gets a `title` field in its frontmatter.
-    public static func newFile(text: String, title: String? = nil, createdAt: Date, timeZone: TimeZone, frontmatter: Bool) -> String {
+    /// with `⌘S` gets a `title` field in its frontmatter. `embeds` (one per attachment) go at the
+    /// end, after a blank line.
+    public static func newFile(
+        text: String,
+        title: String? = nil,
+        createdAt: Date,
+        timeZone: TimeZone,
+        frontmatter: Bool,
+        embeds: [String] = []
+    ) -> String {
         var output = ""
         if frontmatter {
             let created = FileNamer.format(createdAt, "yyyy-MM-dd'T'HH:mm:ssxxxxx", in: timeZone)
@@ -15,27 +23,31 @@ public enum MarkdownWriter {
             }
             output += "created: \(created)\nsource: otter\n---\n"
         }
-        return output + body(text) + "\n"
+        return output + appending(embeds, to: body(text)) + "\n"
     }
 
     /// One block for an append file, rendered from `template` (see `AppendTemplate`), without a
-    /// trailing newline.
+    /// trailing newline. `embeds` (one per attachment) fill `{{attachments}}`, one per line; a
+    /// template without it gets them at the end of `{{text}}`, after a blank line.
     public static func appendBlock(
         template: String,
         text: String,
         createdAt: Date,
         timeZone: TimeZone,
-        attachments: String = ""
+        embeds: [String] = []
     ) -> String {
-        let body = body(text)
+        let template = normalizedLineEndings(template)
+        let noteBody = body(text)
+        let hasAttachmentsTag = template.range(of: #"\{\{\s*attachments\s*\}\}"#, options: .regularExpression) != nil
+        let text = hasAttachmentsTag ? noteBody : appending(embeds, to: noteBody)
         let values = [
             "time": FileNamer.format(createdAt, "HH:mm", in: timeZone),
             "date": FileNamer.format(createdAt, "yyyy-MM-dd", in: timeZone),
-            "text": body,
-            "title": FileNamer.title(from: body),
-            "attachments": attachments,
+            "text": text,
+            "title": FileNamer.title(from: noteBody),
+            "attachments": hasAttachmentsTag ? embeds.joined(separator: "\n") : "",
         ]
-        let rendered = AppendTemplate.render(normalizedLineEndings(template), isMultiLine: body.contains("\n"), values: values)
+        let rendered = AppendTemplate.render(template, isMultiLine: text.contains("\n"), values: values)
         return String(rendered.reversed().drop(while: \.isNewline).reversed())
     }
 
@@ -56,6 +68,15 @@ public enum MarkdownWriter {
     }
 
     // MARK: - Private
+
+    /// `body`, then a blank line and one embed per line. Just the embeds for a note with no text.
+    private static func appending(_ embeds: [String], to body: String) -> String {
+        guard !embeds.isEmpty else {
+            return body
+        }
+        let lines = embeds.joined(separator: "\n")
+        return body.isEmpty ? lines : body + "\n\n" + lines
+    }
 
     /// The note's text with `\n` line endings, without blank lines at either end or trailing
     /// whitespace. A one-line note is trimmed on both sides.

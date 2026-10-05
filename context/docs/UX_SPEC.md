@@ -66,7 +66,8 @@ The `●` in the header is the destination dot (colored per destination), next t
 ### Footer
 
 - **Destination pill** (in the header): colored dot + destination name. For a folder destination the name is the folder's name, its tooltip is the full path, and it highlights on hover. Clicking it (or `⇧⌘O`) opens a folder picker over the panel; the folder chosen becomes where notes are saved from then on, and the text being typed stays as it is (T17). `⌘1…⌘9` switches destination for *this note only*; the default comes back on the next open.
-- **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an inline warning when relevant, e.g. when the destination can't take attachments ("Apple Notes can't take images yet — they'll be dropped." once T08 adds Apple Notes).
+- **Attachment chips** (above the footer, T09): one per pasted or dropped file or image: a thumbnail for images or the file type's icon, the name ("Pasted image" for clipboard image data) and size, and `✕` to remove it. The row scrolls sideways when full and is hidden when empty. Up to 10 per note; a file over 200 MB is refused, one over 25 MB is kept with a warning.
+- **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an orange inline warning when relevant: why a paste wasn't attached (too many, too large, a folder), until the next edit; when the destination can't take attachments ("{Destination} can't take attachments — they'll be dropped." once T08 adds Apple Notes); or when an attachment is over 25 MB.
 - **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the destination pill. Click → menu with Retry / Show details.
 
 ### States
@@ -92,7 +93,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | `⇧⌘⌫` | Panel | Discard draft (and attachments) |
 | `⌘1` … `⌘9` | Panel | Choose destination for this note |
 | `⇧⌘O` | Panel | Change the save folder (same as clicking the folder name in the header) |
-| `⌘V` | Panel | Paste as plain text; images/files become attachments |
+| `⌘V` | Panel | Paste as plain text; files, then images become attachments (formatted text with a picture of itself stays text; concealed pasteboard content is never attached) |
 | `⇧⌥⌘V` | Panel | Paste with original formatting converted to Markdown *(stretch)* |
 | `⌘,` | Panel | Open Settings |
 | `⌘Z` / `⇧⌘Z` | Panel | Undo / redo |

@@ -3,7 +3,8 @@ import OtterCore
 import os
 
 /// Shows, hides and positions the capture panel (T03, T15), and runs its editor: the keyboard map,
-/// submitting, the saved draft (T04) and saving under a name with `⌘S` (T16). The panel is built once here and only ordered in and out,
+/// submitting, the saved draft (T04), saving under a name with `⌘S` (T16) and pasted or dropped
+/// attachments (T09). The panel is built once here and only ordered in and out,
 /// so showing it costs one `makeKeyAndOrderFront` (ARCHITECTURE §9).
 ///
 /// Never calls `NSApp.activate` itself: the panel is non-activating, so the app the user came from
@@ -20,14 +21,21 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let content = PanelContentView()
     private let frameStore: PanelFrameStore
     private let draftStore: DraftStore
+    private let stager: AttachmentStager
     private let destination: @MainActor () -> PanelDestination
     private let refreshDestination: @MainActor () async -> Void
-    private let submitNote: @MainActor (_ text: String, _ file: URL?) async -> Bool
+    private let submitNote: @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment]) async -> Bool
     private let pickFolder: (@MainActor (_ above: NSWindow) async -> Bool)?
     private let pickSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)?
 
     /// What the header shows now.
     private var shownDestination: PanelDestination?
+    /// The note's attachments, staged in `drafts/files/`, in the order they were added.
+    private var attachments: [StagedAttachment] = []
+    /// Attachments still being copied in; they count towards the limit already.
+    private var stagingCount = 0
+    /// Why the last paste or drop wasn't attached. Shown in the footer until the next edit or hide.
+    private var attachmentNotice: String?
 
     /// Fading out: still on screen but already counted as hidden.
     private var isHiding = false
@@ -58,22 +66,25 @@ final class PanelController: NSObject, NSWindowDelegate {
     ///   - destination: The destination the header shows.
     ///   - refreshDestination: Checks the default destination, so a renamed folder's new name is
     ///     saved before `destination` is read again.
-    ///   - submit: Puts the note in the outbox, to be written to the file chosen in the Save panel if
-    ///     there is one. Returns `true` once it's safe there.
+    ///   - attachmentStager: Keeps pasted and dropped files in `drafts/files/` until the note is submitted.
+    ///   - submit: Puts the note and its attachments in the outbox, to be written to the file chosen
+    ///     in the Save panel if there is one. Returns `true` once it's safe there.
     ///   - chooseFolder: Shows the folder picker above the panel. Returns `true` if the folder changed.
     ///   - chooseSaveFile: Shows the Save panel above the panel, offering `defaultName`.
     ///     Returns the file chosen, or `nil` for Cancel.
     init(
         defaults: UserDefaults = .standard,
         draftStore: DraftStore,
+        attachmentStager: AttachmentStager,
         destination: @escaping @MainActor () -> PanelDestination,
         refreshDestination: @escaping @MainActor () async -> Void = {},
-        submit: @escaping @MainActor (_ text: String, _ file: URL?) async -> Bool,
+        submit: @escaping @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment]) async -> Bool,
         chooseFolder: (@MainActor (_ above: NSWindow) async -> Bool)? = nil,
         chooseSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)? = nil
     ) {
         frameStore = PanelFrameStore(defaults: defaults)
         self.draftStore = draftStore
+        stager = attachmentStager
         self.destination = destination
         self.refreshDestination = refreshDestination
         submitNote = submit
@@ -89,6 +100,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.onCancel = { [weak self] in self?.hide() }
         content.editor.onCommand = { [weak self] command in self?.perform(command) }
         content.editor.onTextChange = { [weak self] in self?.saveDraft() }
+        content.editor.onAttach = { [weak self] pasted in self?.attach(pasted) }
+        content.attachmentChips.onRemove = { [weak self] attachment in self?.removeAttachments([attachment]) }
         if chooseFolder != nil {
             content.onChooseFolder = { [weak self] in self?.chooseFolder() }
         }
@@ -103,9 +116,11 @@ final class PanelController: NSObject, NSWindowDelegate {
             }
         }
 
-        // Read off the main thread now, so the first show finds it in memory.
-        DispatchQueue.global(qos: .utility).async {
-            _ = draftStore.load()
+        // Read off the main thread now, so the first show finds it in memory. Then staged files the
+        // draft no longer refers to are swept up.
+        Task.detached(priority: .utility) {
+            let draft = draftStore.load()
+            await attachmentStager.removeOrphans(keeping: draft?.attachmentRefs ?? [])
         }
     }
 
@@ -148,8 +163,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
         if !didRestoreDraft {
             didRestoreDraft = true
-            content.editor.setText(draftStore.load()?.text ?? "")
+            let draft = draftStore.load()
+            content.editor.setText(draft?.text ?? "")
+            attachments = stager.staged(draft?.attachmentRefs ?? [])
+            content.setAttachments(attachments)
         }
+        content.attachmentChips.loadThumbnails()
+        updateFooter()
         content.setReduceTransparency(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
         // Placed while still ordered out, so the move isn't mistaken for a drag. A press during the
         // fade-out brings the panel back where it is.
@@ -176,6 +196,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         if didRestoreDraft {
             draftStore.saveNow(currentDraft)
         }
+        attachmentNotice = nil
+        content.attachmentChips.releaseThumbnails()
         if let app = appToReactivate {
             appToReactivate = nil
             // Only if Otter still has focus; a click elsewhere has already put it somewhere else.
@@ -290,12 +312,87 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private var currentDraft: Draft {
-        Draft(text: content.editor.text)
+        Draft(text: content.editor.text, attachmentRefs: attachments.map(\.attachment))
     }
 
     /// Every edit. Written once typing pauses.
     private func saveDraft() {
         draftStore.save(currentDraft)
+        if attachmentNotice != nil {
+            attachmentNotice = nil
+            updateFooter()
+        }
+    }
+
+    // MARK: Attachments (T09)
+
+    /// Copies pasted or dropped files and images into `drafts/files/`, one at a time, and adds a chip
+    /// for each. Past the limits, the footer says why and nothing more is attached.
+    private func attach(_ pasted: PastedAttachments) {
+        Task {
+            switch pasted {
+            case let .files(urls):
+                for url in urls {
+                    guard await stage({ [stager] in try await stager.stageFile(at: url) }) else {
+                        break
+                    }
+                }
+            case let .image(data, uti):
+                await stage { [stager] in try await stager.stageImage(data, uti: uti) }
+            }
+        }
+    }
+
+    /// Returns `false` once nothing more can be attached to this note.
+    @discardableResult
+    private func stage(_ staging: @escaping @Sendable () async throws -> StagedAttachment) async -> Bool {
+        guard attachments.count + stagingCount < AttachmentLimits.maxCount else {
+            refuseAttachment(AttachmentError.tooMany)
+            return false
+        }
+        stagingCount += 1
+        defer { stagingCount -= 1 }
+        do {
+            attachments.append(try await staging())
+            attachmentNotice = nil
+            attachmentsDidChange()
+        } catch {
+            refuseAttachment(error)
+        }
+        return true
+    }
+
+    private func refuseAttachment(_ error: any Error) {
+        NSSound.beep()
+        attachmentNotice = error.localizedDescription
+        updateFooter()
+    }
+
+    /// `✕` on a chip, `⇧⌘⌫`, or a submit that took them. The draft forgets them before their files go.
+    private func removeAttachments(_ removed: [Attachment]) {
+        let ids = Set(removed.map(\.id))
+        attachments.removeAll { ids.contains($0.attachment.id) }
+        attachmentsDidChange()
+        Task { [stager] in
+            await stager.remove(removed)
+        }
+    }
+
+    /// Saved straight away rather than after a pause: the files are already on disk.
+    private func attachmentsDidChange() {
+        content.setAttachments(attachments)
+        draftStore.saveNow(currentDraft)
+        updateFooter()
+    }
+
+    /// A refused paste, then a warning about the destination or large files, else the hints.
+    private func updateFooter() {
+        let warning = AttachmentLimits.footerWarning(
+            for: attachments.map(\.attachment),
+            destinationName: shownDestination?.name ?? "",
+            supportsAttachments: shownDestination?.supportsAttachments ?? true
+        )
+        content.setFooterWarning(attachmentNotice ?? warning)
     }
 
     private func perform(_ command: EditorCommand) {
@@ -303,8 +400,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         case let .submit(closeAfter):
             submit(closeAfter: closeAfter)
         case .discard:
-            // Undoable; the edit saves the now-empty draft. Attachments join in T09.
+            // The text can be brought back with `⌘Z`; the attachments can't.
             content.editor.discardText()
+            removeAttachments(attachments.map(\.attachment))
         case let .selectDestination(index):
             Logger.panel.info("Destination \(index + 1, privacy: .public) chosen; destinations are picked here from T10")
         case .openSettings:
@@ -320,6 +418,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         let destination = destination()
         shownDestination = destination
         content.setDestination(name: destination.name, folderPath: destination.folderPath)
+        updateFooter()
     }
 
     /// The header's folder name or `⇧⌘O` (T17).
@@ -376,8 +475,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// No text worth saving and no attachments. A screenshot on its own is a note.
     private var isNoteEmpty: Bool {
-        content.editor.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        attachments.isEmpty && content.editor.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// `⌘↩`, `⇧⌘↩` and Save in the `⌘S` Save panel (with `file`). The draft is cleared only once the
@@ -387,6 +487,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             return
         }
         let text = content.editor.text
+        let submitted = attachments
         guard !isNoteEmpty else {
             if closeAfter {
                 hide()
@@ -396,16 +497,25 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         isSubmitting = true
         Task {
-            let saved = await submitNote(text, file)
+            let saved = await submitNote(text, file, submitted)
             isSubmitting = false
             guard saved else {
                 return
             }
-            // Text typed while the note was being saved stays, rather than being lost with it.
+            // The outbox has taken the attachments' files. Text typed, and files attached, while the
+            // note was being saved stay, rather than being lost with it.
+            let submittedIDs = Set(submitted.map(\.attachment.id))
+            attachments.removeAll { submittedIDs.contains($0.attachment.id) }
+            content.setAttachments(attachments)
             if content.editor.text == text {
                 content.editor.clear()
-                draftStore.clear()
             }
+            if isNoteEmpty {
+                draftStore.clear()
+            } else {
+                draftStore.saveNow(currentDraft)
+            }
+            updateFooter()
             if closeAfter {
                 hide()
             }
@@ -465,6 +575,8 @@ struct PanelDestination {
     var name: String
     /// The full path, for a folder destination; its name then opens the folder picker (T17).
     var folderPath: String?
+    /// `false` puts a warning in the footer while the note has attachments (T09).
+    var supportsAttachments = true
 }
 
 private extension NSScreen {

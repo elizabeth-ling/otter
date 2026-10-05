@@ -2,17 +2,24 @@ import AppKit
 import OtterCore
 
 /// The panel's content (UX_SPEC §1): a rounded vibrant background holding the header strip
-/// (destination dot and name, and the drag handle), the editor and the footer hints.
+/// (destination dot and name, and the drag handle), the editor, the attachment chips (T09) and the
+/// footer hints.
 final class PanelContentView: NSVisualEffectView {
     static let headerHeight: CGFloat = 32
     static let footerHeight: CGFloat = 28
     static let inset: CGFloat = 14
     static let cornerRadius: CGFloat = 12
 
+    static let footerHints = "⌘↩ Save · ⌘S Save as…"
+
     let editor = EditorView(font: .systemFont(ofSize: 15), inset: PanelContentView.inset, placeholder: "Jot something down…")
+    let attachmentChips = AttachmentChips()
 
     private let solidBackground = NSView()
     private let destinationPill = DestinationPill()
+    private let footerLabel = NSTextField(labelWithString: PanelContentView.footerHints)
+    /// Zero while there are no attachments, so the editor takes the room.
+    private lazy var chipsHeight = attachmentChips.heightAnchor.constraint(equalToConstant: 0)
 
     /// Clicking a folder destination's name in the header (T17).
     var onChooseFolder: (() -> Void)? {
@@ -38,7 +45,9 @@ final class PanelContentView: NSVisualEffectView {
         let header = makeHeader()
         let footer = makeFooter()
         editor.translatesAutoresizingMaskIntoConstraints = false
-        for view in [header, editor, footer] {
+        attachmentChips.translatesAutoresizingMaskIntoConstraints = false
+        attachmentChips.isHidden = true
+        for view in [header, editor, attachmentChips, footer] {
             addSubview(view)
         }
 
@@ -51,7 +60,12 @@ final class PanelContentView: NSVisualEffectView {
             editor.topAnchor.constraint(equalTo: header.bottomAnchor),
             editor.leadingAnchor.constraint(equalTo: leadingAnchor),
             editor.trailingAnchor.constraint(equalTo: trailingAnchor),
-            editor.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            editor.bottomAnchor.constraint(equalTo: attachmentChips.topAnchor),
+
+            attachmentChips.leadingAnchor.constraint(equalTo: leadingAnchor),
+            attachmentChips.trailingAnchor.constraint(equalTo: trailingAnchor),
+            attachmentChips.bottomAnchor.constraint(equalTo: footer.topAnchor),
+            chipsHeight,
 
             footer.leadingAnchor.constraint(equalTo: leadingAnchor),
             footer.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -70,6 +84,30 @@ final class PanelContentView: NSVisualEffectView {
     /// is `nil` unless it's a folder destination, whose name then opens the folder picker.
     func setDestination(name: String, folderPath: String?) {
         destinationPill.set(name: name, folderPath: folderPath)
+    }
+
+    /// Shows the chips row, or hides it and gives the room back to the editor.
+    func setAttachments(_ attachments: [StagedAttachment]) {
+        attachmentChips.set(attachments)
+        attachmentChips.isHidden = attachments.isEmpty
+        chipsHeight.constant = attachments.isEmpty ? 0 : AttachmentChips.height
+    }
+
+    /// A warning in place of the footer hints (UX_SPEC §1), or `nil` for the hints.
+    func setFooterWarning(_ warning: String?) {
+        guard footerLabel.stringValue != warning ?? Self.footerHints else {
+            return
+        }
+        footerLabel.stringValue = warning ?? Self.footerHints
+        footerLabel.textColor = warning == nil ? .tertiaryLabelColor : .systemOrange
+        footerLabel.lineBreakMode = warning == nil ? .byTruncatingHead : .byTruncatingTail
+        footerLabel.toolTip = warning
+        if let warning {
+            NSAccessibility.post(element: footerLabel, notification: .announcementRequested, userInfo: [
+                .announcement: warning,
+                .priority: NSAccessibilityPriorityLevel.medium.rawValue,
+            ])
+        }
     }
 
     /// Reduce Transparency swaps the vibrancy for a solid `windowBackgroundColor`.
@@ -119,7 +157,7 @@ final class PanelContentView: NSVisualEffectView {
         separator.translatesAutoresizingMaskIntoConstraints = false
         footer.addSubview(separator)
 
-        let hints = NSTextField(labelWithString: "⌘↩ Save · ⌘S Save as…")
+        let hints = footerLabel
         hints.font = .systemFont(ofSize: 11)
         hints.textColor = .tertiaryLabelColor
         hints.lineBreakMode = .byTruncatingHead

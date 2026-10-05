@@ -44,7 +44,7 @@ Otter/
 │   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
 │   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
-│   ├── Panel/AttachmentChips.swift
+│   ├── Panel/AttachmentChips.swift   # chips row above the footer: thumbnail or icon, name, size, ✕ (T09)
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   ├── HUD/HUDController.swift
 │   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10; also opened from the panel header (T17)
@@ -56,9 +56,10 @@ Otter/
 └── Packages/OtterCore/
     ├── Sources/OtterCore/
     │   ├── Model/Capture.swift, Attachment.swift, DestinationConfig.swift
+    │   ├── Attachments/PasteRules.swift, AttachmentLimits.swift, AttachmentStager.swift   # what a paste becomes, limits + footer text, drafts/files/ (T09)
     │   ├── Pipeline/Outbox.swift, DeliveryService.swift, DeliveryClock.swift, RecentStore.swift, DraftStore.swift,
     │   │            CaptureFailure.swift, StorageLocations.swift
-    │   ├── Destinations/Destination.swift, DestinationRegistry.swift
+    │   ├── Destinations/Destination.swift, DestinationRegistry.swift, AttachmentEmbed.swift
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift,
 │   │                       FolderBookmark.swift, FolderRegistration.swift   # builder, default inbox (T06)
     │   ├── Destinations/Obsidian/ObsidianVault.swift, ObsidianVaultSettings.swift,   # vault lookup, app.json (T07)
@@ -89,9 +90,9 @@ public struct Capture: Codable, Identifiable, Sendable {
 
 public struct Attachment: Codable, Sendable {
     public let id: UUID
-    public var originalName: String?
+    public var originalName: String?    // nil for clipboard image data: saved as "Pasted image yyyyMMddHHmmss.<ext>"
     public var uti: String              // e.g. public.png
-    public var relativePath: String     // inside outbox/<capture-id>/files/
+    public var relativePath: String     // "<id>.<ext>" inside drafts/files/, then outbox/<capture-id>/files/
     public var byteCount: Int
 }
 
@@ -160,6 +161,7 @@ sequenceDiagram
 - **Saved with `⌘S`** (T16, ADR-014): written to exactly the file chosen in the Save panel, in any folder and whatever the mode, replacing a file already there (the Save panel confirmed it). Atomic, like new files; a retry rewrites the same file.
 - **New file per note**: `{yyyy-MM-dd HHmm} {title}.md`, where `title` = the first non-empty line, Markdown markers stripped, characters illegal in filenames or Obsidian links removed (`/ \ : * ? " < > | # ^ [ ]`), trimmed to 60 chars, fallback "Quick note". Collisions get ` 2`, ` 3`….
 - **Append to file**: creates the file if missing; ensures a trailing newline; appends a block rendered from a template (default below), with one blank line between blocks. `{{time}}` is `HH:mm`.
+- **Attachments** (T09): copied before the note is written, into `attachmentsFolder` (default `attachments`) relative to the note's folder, or inside a vault where `app.json` says (§5.2). A pasted image is named `Pasted image yyyyMMddHHmmss.<ext>` from the capture's time; a file keeps its name. A taken name gets ` 2`, ` 3`…, unless the file there has the same bytes: that's the copy a failed earlier attempt made, so a retry reuses it. The note links to them at the end, after a blank line, one per line: `![](attachments/Pasted%20image%20….png)` for images, `[spec.pdf](attachments/spec.pdf)` for other files. In append mode `{{attachments}}` places them; a template without it gets them after `{{text}}`.
 - Optional YAML frontmatter on new files: `title` (double-quoted, named captures only), `created` (ISO 8601 with offset), `source: otter`.
 - A folder that was deleted (including one sitting in the Trash, where its bookmark still resolves) is "Folder missing": captures stay in the outbox until it's recreated where it was or another folder is chosen. Only the default inbox is recreated automatically.
 - **Writes are atomic for new files** (temp file in the same directory + rename) and **coordinated for appends** (`NSFileCoordinator` with `.forMerging`, then `FileHandle.seekToEnd()` + write + `synchronize()`), which keeps iCloud Drive and Obsidian's file watcher happy.
@@ -188,7 +190,7 @@ There's no Obsidian destination: a vault is just a folder (ADR-002, ADR-013). A 
 | Attachment folder | `<vault>/.obsidian/app.json` → `attachmentFolderPath` (`/` = vault root, `./` = same folder as note, `./sub` = subfolder of note's folder, otherwise a vault-relative path; `..` and absolute paths fall back to the root). Overrides `FolderOptions.attachmentsFolder` inside a vault. |
 | Link style | `<vault>/.obsidian/app.json` → `useMarkdownLinks` (`![[x.png]]` vs `![](x.png)`) and `newLinkFormat` (`shortest`, `relative`, `absolute`) |
 
-`app.json` is read at each delivery (it's tiny), so changes made in Obsidian apply without a relaunch. Missing or malformed files, and keys of the wrong type, fall back to Obsidian's defaults: attachments at the vault root, wikilinks, `shortest`. `ObsidianAttachmentPlacement` turns these into the directory to copy into and the embed text; T09 wires it in. Markdown links are relative to the note and percent-encoded. A file name with `# ^ [ ] |` can't be a wikilink target, so it gets a Markdown link even in a wikilink vault. Otter never writes inside `.obsidian/`.
+`app.json` is read at each delivery (it's tiny), so changes made in Obsidian apply without a relaunch. Missing or malformed files, and keys of the wrong type, fall back to Obsidian's defaults: attachments at the vault root, wikilinks, `shortest`. `ObsidianAttachmentPlacement` turns these into the directory to copy into and the embed text, which `FolderDestination` uses for every attachment of a note in a vault (T09). Markdown links are relative to the note and percent-encoded. A file name with `# ^ [ ] |` can't be a wikilink target, so it gets a Markdown link even in a wikilink vault. Otter never writes inside `.obsidian/`.
 
 Obsidian does **not** need to be running. "Open in Obsidian" (`ObsidianLink.open`, used by T12's Recent menu) checks at open time whether the note is in a vault and something handles `obsidian://`, then opens `obsidian://open?vault=<name>&file=<vault-relative path without .md>`, with both values percent-encoded except `A–Z a–z 0–9 - . _ ~`. Otherwise it reveals the file in Finder.
 
@@ -239,6 +241,7 @@ All under `~/Library/Application Support/Otter/`:
 
 ```
 drafts/current.json          # text + attachment refs of the in-progress note
+drafts/files/                # its attachments, as <attachment-id>.<ext>, until submitted (T09)
 outbox/<capture-id>.json     # pending capture + delivery attempts + last error
 outbox/<capture-id>/files/   # attachment payloads until delivered
 recent.json                  # last 20 receipts (first line, destination, location, time) — opt-out

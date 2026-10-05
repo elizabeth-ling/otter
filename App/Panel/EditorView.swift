@@ -1,4 +1,5 @@
 import AppKit
+import OtterCore
 
 /// What the panel's keyboard map asks for (UX_SPEC §2). `PanelController` acts on it.
 enum EditorCommand {
@@ -16,6 +17,12 @@ enum EditorCommand {
     case saveAs
 }
 
+/// Files or an image pasted or dropped into the editor (T09). Text is pasted by the editor itself.
+enum PastedAttachments {
+    case files([URL])
+    case image(Data, uti: String)
+}
+
 /// The panel's plain-text editor (T04, ADR-007): an `NSTextView` in a scroll view that fills the text
 /// area. The panel keeps its size; long text scrolls.
 final class EditorView: NSScrollView {
@@ -23,6 +30,12 @@ final class EditorView: NSScrollView {
     var onCommand: ((EditorCommand) -> Void)? {
         get { textView.onCommand }
         set { textView.onCommand = newValue }
+    }
+
+    /// Files and images pasted (`⌘V`) or dropped (T09).
+    var onAttach: ((PastedAttachments) -> Void)? {
+        get { textView.onAttach }
+        set { textView.onAttach = newValue }
     }
 
     /// Every edit by the user, including undo and discard. Not called for `setText` or `clear`.
@@ -123,6 +136,7 @@ final class EditorTextView: NSTextView {
 
     fileprivate var onCommand: ((EditorCommand) -> Void)?
     fileprivate var onTextChange: (() -> Void)?
+    fileprivate var onAttach: ((PastedAttachments) -> Void)?
 
     /// Dragging in the text selects text; it never moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
@@ -130,6 +144,38 @@ final class EditorTextView: NSTextView {
     /// `NSTextView` turns `Esc` into "complete"; hide the panel instead.
     override func cancelOperation(_ sender: Any?) {
         window?.cancelOperation(sender)
+    }
+
+    // MARK: Paste and drop (T09)
+
+    /// Files and images become attachments; anything else is pasted as plain text.
+    override func paste(_ sender: Any?) {
+        if let attachments = Self.attachments(on: .general) {
+            onAttach?(attachments)
+            return
+        }
+        super.paste(sender)
+    }
+
+    /// Lets files and images be dropped, not only text.
+    override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
+        super.acceptableDragTypes + [.fileURL] + PasteRules.imageTypes.map { NSPasteboard.PasteboardType($0) }
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        Self.kind(of: sender.draggingPasteboard) == .text ? super.draggingEntered(sender) : .copy
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        Self.kind(of: sender.draggingPasteboard) == .text ? super.draggingUpdated(sender) : .copy
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let attachments = Self.attachments(on: sender.draggingPasteboard) else {
+            return super.performDragOperation(sender)
+        }
+        onAttach?(attachments)
+        return true
     }
 
     override func didChangeText() {
@@ -217,6 +263,28 @@ final class EditorTextView: NSTextView {
     }
 
     // MARK: - Private
+
+    /// What the pasteboard holds, by `PasteRules`, without reading any image data.
+    private static func kind(of pasteboard: NSPasteboard) -> PasteKind {
+        let types = pasteboard.types?.map(\.rawValue) ?? []
+        let hasFileURLs = pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        let hasText = pasteboard.string(forType: .string).map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+        return PasteRules.kind(types: types, hasFileURLs: hasFileURLs, hasText: hasText)
+    }
+
+    /// The files or the image on the pasteboard, or `nil` if it should be pasted as text.
+    private static func attachments(on pasteboard: NSPasteboard) -> PastedAttachments? {
+        switch kind(of: pasteboard) {
+        case .files:
+            let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+            return urls.isEmpty ? nil : .files(urls)
+        case let .image(uti):
+            // The raw data, so PNG, JPEG and HEIC keep their format; `NSImage` would re-encode it.
+            return pasteboard.data(forType: NSPasteboard.PasteboardType(uti)).map { .image($0, uti: uti) }
+        case .text:
+            return nil
+        }
+    }
 
     /// Return and keypad Enter.
     private static let returnKeyCodes: Set<UInt16> = [36, 76]

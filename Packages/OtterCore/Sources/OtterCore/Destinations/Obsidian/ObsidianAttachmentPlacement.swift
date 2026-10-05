@@ -1,9 +1,8 @@
 import Foundation
-import UniformTypeIdentifiers
 
 /// Where an attachment goes in a vault and how the note links to it, following the vault's
 /// `app.json` the way Obsidian would (ARCHITECTURE §5.2). Inside a vault this overrides
-/// `FolderOptions.attachmentsFolder`. Pure: no disk access. T09 copies the file and adds the embed.
+/// `FolderOptions.attachmentsFolder`. Pure: no disk access. `FolderDestination` copies the file and adds the embed.
 public struct ObsidianAttachmentPlacement: Sendable, Equatable {
     /// The folder to copy the attachment into. It may not exist yet.
     public let directory: URL
@@ -22,10 +21,8 @@ public struct ObsidianAttachmentPlacement: Sendable, Equatable {
         let folder = Self.attachmentFolder(settings.attachmentFolderPath, noteFolder: noteFolder)
         directory = folder.reduce(vault.root) { $0.appendingPathComponent($1, isDirectory: true) }
 
-        let isImage = Self.isImage(fileName)
         let fromNote = Self.relativePath(from: noteFolder, to: folder + [fileName])
-        let url = fromNote.map(Self.percentEncoded).joined(separator: "/")
-        let markdownLink = isImage ? "![](\(url))" : "[\(Self.escapedLinkText(fileName))](\(url))"
+        let markdownLink = AttachmentEmbed.markdown(fileName: fileName, path: fromNote)
         guard !settings.useMarkdownLinks, !fileName.contains(where: Self.wikilinkBreakers.contains) else {
             // A name with `#`, `^`, `[`, `]` or `|` can't be a wikilink target, so it gets a
             // Markdown link even in a wikilink vault; Obsidian resolves both.
@@ -40,7 +37,7 @@ public struct ObsidianAttachmentPlacement: Sendable, Equatable {
         case .relative:
             fromNote.joined(separator: "/")
         }
-        embed = "\(isImage ? "!" : "")[[\(target)]]"
+        embed = "\(AttachmentEmbed.isImage(fileName) ? "!" : "")[[\(target)]]"
     }
 
     // MARK: - Private
@@ -70,20 +67,5 @@ public struct ObsidianAttachmentPlacement: Sendable, Equatable {
             common += 1
         }
         return Array(repeating: "..", count: from.count - common) + to.dropFirst(common)
-    }
-
-    private static func isImage(_ fileName: String) -> Bool {
-        let pathExtension = (fileName as NSString).pathExtension
-        return UTType(filenameExtension: pathExtension)?.conforms(to: .image) ?? false
-    }
-
-    /// Percent-encodes everything but `A–Z a–z 0–9 - . _ ~`, so spaces, `#`, `(` and `)` can't end
-    /// the link early.
-    private static func percentEncoded(_ component: String) -> String {
-        component.addingPercentEncoding(withAllowedCharacters: ObsidianLink.unreserved) ?? component
-    }
-
-    private static func escapedLinkText(_ text: String) -> String {
-        text.replacingOccurrences(of: "[", with: "\\[").replacingOccurrences(of: "]", with: "\\]")
     }
 }

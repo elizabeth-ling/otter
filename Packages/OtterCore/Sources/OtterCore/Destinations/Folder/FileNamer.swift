@@ -1,12 +1,18 @@
 import Foundation
+import UniformTypeIdentifiers
 
-/// Names new note files and checks paths from settings (ARCHITECTURE §5.1). Pure: no disk access.
+/// Names new note files and attachments, and checks paths from settings (ARCHITECTURE §5.1). Pure: no
+/// disk access.
 ///
 /// Note text never reaches a path unsanitized: a title or template can only produce a single file
 /// name, and a subfolder or append-file name that leaves the folder is rejected.
 public enum FileNamer {
     public static let fallbackTitle = "Quick note"
     public static let maxTitleLength = 60
+    /// For an attached file whose name is nothing but dots and spaces.
+    public static let fallbackAttachmentName = "Attachment"
+    /// APFS's limit for one file name.
+    static let maxNameBytes = 255
     /// Leaves room for a collision suffix and `.md` under APFS's 255-byte name limit.
     static let maxBaseNameBytes = 240
 
@@ -53,6 +59,39 @@ public enum FileNamer {
     /// `base 2.md`, `base 3.md`….
     public static func fileName(base: String, number: Int, pathExtension: String = "md") -> String {
         number <= 1 ? "\(base).\(pathExtension)" : "\(base) \(number).\(pathExtension)"
+    }
+
+    /// The name a clipboard image is saved under, as Obsidian names pastes:
+    /// `Pasted image yyyyMMddHHmmss.png`. Taken from the capture's time, so a retry picks the same name.
+    public static func pastedImageName(date: Date, timeZone: TimeZone, pathExtension: String) -> String {
+        "Pasted image \(format(date, "yyyyMMddHHmmss", in: timeZone)).\(pathExtension)"
+    }
+
+    /// The name `attachment` is saved under in the destination, before any collision suffix: a
+    /// pasted image's generated name, or a file's own name made safe (one path component, not
+    /// hidden, at most 255 bytes, extension kept).
+    public static func attachmentName(for attachment: Attachment, capturedAt date: Date, timeZone: TimeZone) -> String {
+        guard let original = attachment.originalName else {
+            let pathExtension = UTType(attachment.uti)?.preferredFilenameExtension ?? "png"
+            return pastedImageName(date: date, timeZone: timeZone, pathExtension: pathExtension)
+        }
+        let cleaned = String(original.filter { $0 != "/" && !isControl($0) }.drop { $0 == "." || $0.isWhitespace })
+        let name = trimmed(cleaned)
+        guard !name.isEmpty else {
+            return fallbackAttachmentName
+        }
+        return fittingNameLimit(name)
+    }
+
+    /// The `number`th name to try for an attachment: `spec.pdf`, then `spec 2.pdf`, `spec 3.pdf`….
+    public static func numberedAttachmentName(_ name: String, number: Int) -> String {
+        guard number > 1 else {
+            return name
+        }
+        let base = (name as NSString).deletingPathExtension
+        let pathExtension = (name as NSString).pathExtension
+        let numbered = pathExtension.isEmpty ? "\(base) \(number)" : "\(base) \(number).\(pathExtension)"
+        return fittingNameLimit(numbered)
     }
 
     /// The components of a path from settings (a subfolder, an append-file name) that must stay
@@ -109,6 +148,20 @@ public enum FileNamer {
             return trimmed(prefix[..<space])
         }
         return String(prefix)
+    }
+
+    /// Shortens the part before the extension until the whole name fits in `maxNameBytes`.
+    private static func fittingNameLimit(_ name: String) -> String {
+        guard name.utf8.count > maxNameBytes else {
+            return name
+        }
+        let pathExtension = (name as NSString).pathExtension
+        let suffix = pathExtension.isEmpty || pathExtension.utf8.count > 16 ? "" : ".\(pathExtension)"
+        var base = suffix.isEmpty ? name : String(name.dropLast(suffix.count))
+        while base.utf8.count + suffix.utf8.count > maxNameBytes {
+            base.removeLast()
+        }
+        return base + suffix
     }
 
     private static func isControl(_ character: Character) -> Bool {

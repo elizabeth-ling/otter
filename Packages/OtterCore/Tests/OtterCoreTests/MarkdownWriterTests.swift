@@ -64,7 +64,7 @@ private let paris = TimeZone(identifier: "Europe/Paris")!
 
 @Test func customTemplateFillsEveryVariable() {
     let template = "## {{date}} {{time}} — {{title}}\n{{text}}\n{{attachments}}"
-    let block = MarkdownWriter.appendBlock(template: template, text: "# Plan\nstep 1", createdAt: referenceDate, timeZone: paris, attachments: "![[img.png]]")
+    let block = MarkdownWriter.appendBlock(template: template, text: "# Plan\nstep 1", createdAt: referenceDate, timeZone: paris, embeds: ["![[img.png]]"])
     #expect(block == "## 2026-09-21 16:13 — Plan\n# Plan\nstep 1\n![[img.png]]")
 }
 

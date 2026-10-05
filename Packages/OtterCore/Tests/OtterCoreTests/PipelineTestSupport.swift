@@ -166,7 +166,7 @@ enum FakeDeliveryError: Error, Equatable {
 actor FakeDestination: Destination {
     nonisolated let id: DestinationID
     nonisolated let displayName: String
-    nonisolated let supportsAttachments = true
+    nonisolated let supportsAttachments: Bool
 
     private let clock: any DeliveryClock
     private var failuresLeft: Int
@@ -190,10 +190,12 @@ actor FakeDestination: Destination {
         error: any Error = FakeDeliveryError.offline,
         delay: Duration? = nil,
         held: Bool = false,
+        supportsAttachments: Bool = true,
         clock: any DeliveryClock
     ) {
         self.id = id
         displayName = name
+        self.supportsAttachments = supportsAttachments
         failuresLeft = failTimes
         self.error = error
         self.delay = delay
