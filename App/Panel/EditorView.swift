@@ -228,6 +228,10 @@ final class EditorTextView: NSTextView {
         default:
             break
         }
+        if let style = Self.formattingShortcuts[EditShortcut(flags: flags.rawValue, key: key)] {
+            applyFormatting(style)
+            return true
+        }
 
         // Otter is never the active app, so the Edit menu may not see these. Sent to the first
         // responder (this view, then the window for undo and redo).
@@ -246,6 +250,25 @@ final class EditorTextView: NSTextView {
             return
         }
         super.doCommand(by: selector)
+    }
+
+    /// `⌘B`, `⌘I`, `⇧⌘X`, `⌘E` and `⌘K`: adds or removes Markdown markers as one edit, so `⌘Z`
+    /// undoes it and the draft is saved. The text itself is never styled.
+    private func applyFormatting(_ style: MarkdownStyle) {
+        let clipboard = style == .link ? Self.clipboardText() : nil
+        guard let edit = MarkdownFormatting.apply(style, to: string, selection: selectedRange(), clipboard: clipboard) else {
+            NSSound.beep()
+            return
+        }
+        breakUndoCoalescing()
+        guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else {
+            return
+        }
+        replaceCharacters(in: edit.range, with: edit.replacement)
+        undoManager?.setActionName(Self.actionNames[style] ?? "Format")
+        didChangeText()
+        setSelectedRange(edit.selection)
+        scrollRangeToVisible(edit.selection)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -286,6 +309,15 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// The clipboard's text for `⌘K`. Concealed content (a password) is never put in a note.
+    private static func clipboardText() -> String? {
+        let pasteboard = NSPasteboard.general
+        guard !(pasteboard.types ?? []).contains(NSPasteboard.PasteboardType(PasteRules.concealedType)) else {
+            return nil
+        }
+        return pasteboard.string(forType: .string)
+    }
+
     /// Return and keypad Enter.
     private static let returnKeyCodes: Set<UInt16> = [36, 76]
     /// Backspace.
@@ -303,5 +335,17 @@ final class EditorTextView: NSTextView {
         EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "c"): #selector(copy(_:)),
         EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "v"): #selector(paste(_:)),
         EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "a"): #selector(selectAll(_:)),
+    ]
+
+    private static let formattingShortcuts: [EditShortcut: MarkdownStyle] = [
+        EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "b"): .bold,
+        EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "i"): .italic,
+        EditShortcut(flags: NSEvent.ModifierFlags([.command, .shift]).rawValue, key: "x"): .strikethrough,
+        EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "e"): .code,
+        EditShortcut(flags: NSEvent.ModifierFlags.command.rawValue, key: "k"): .link,
+    ]
+
+    private static let actionNames: [MarkdownStyle: String] = [
+        .bold: "Bold", .italic: "Italic", .strikethrough: "Strikethrough", .code: "Code", .link: "Link",
     ]
 }

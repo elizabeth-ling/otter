@@ -95,8 +95,14 @@ The `●` in the header is the destination dot (colored per destination), next t
 | `⇧⌘O` | Panel | Change the save folder (same as clicking the folder name in the header) |
 | `⌘V` | Panel | Paste as plain text; files, then images become attachments (formatted text with a picture of itself stays text; concealed pasteboard content is never attached) |
 | `⇧⌥⌘V` | Panel | Paste with original formatting converted to Markdown *(stretch)* |
+| `⌘B` / `⌘I` | Panel | Bold `**…**` / italic `*…*` on the selection, or the word the caret is in; elsewhere inserts an empty pair with the caret between. Pressed again, removes it |
+| `⇧⌘X` | Panel | Strikethrough `~~…~~`, the same way |
+| `⌘E` | Panel | Inline code `` `…` ``, the same way |
+| `⌘K` | Panel | Link: `[selection](url)` with `url` selected to type over. A URL on the clipboard is used instead, caret after the link; a selected URL becomes `[](URL)` with the caret in the brackets |
 | `⌘,` | Panel | Open Settings |
 | `⌘Z` / `⇧⌘Z` | Panel | Undo / redo |
+
+The formatting shortcuts only add or remove Markdown markers; the text is never styled (rich text is a non-goal). Each is one `⌘Z` step. Surrounding spaces stay outside the markers, a selection across lines is done line by line (blank lines skipped, list and quote markers left outside), and bold and italic nest (`***both***`) rather than undoing each other.
 
 Clicking outside the panel closes it (keeps the draft). Setting: "Keep panel open when clicking elsewhere".
 

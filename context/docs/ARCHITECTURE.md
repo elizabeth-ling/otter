@@ -65,6 +65,7 @@ Otter/
     │   ├── Destinations/Obsidian/ObsidianVault.swift, ObsidianVaultSettings.swift,   # vault lookup, app.json (T07)
     │   │                         ObsidianAttachmentPlacement.swift, ObsidianLink.swift, VaultDiscovery.swift
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift   # after v1 (T08)
+    │   ├── Editor/MarkdownFormatting.swift   # ⌘B/⌘I/⇧⌘X/⌘E/⌘K: Markdown markers to add or remove, as one edit
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
     │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
