@@ -839,10 +839,12 @@ final class EditorTextView: NSTextView {
             }
             let location = content.offset(from: documentStart, to: fragment.rangeInElement.location)
             if let item = Self.item(startingAt: location, in: items), !styler.isRevealed(item), let line = fragment.textLineFragments.first {
+                // An item with no text has only hidden glyphs, whose baseline is the line's bottom.
+                let baseline = item.contentRange.length == 0 ? styler.lineMetrics.baseline : line.typographicBounds.minY + line.glyphOrigin.y
                 markers.append(ListMarker(
                     item: item,
                     levelStart: origin.x + padding + styler.levelStart(level: item.level),
-                    baseline: origin.y + frame.minY + line.typographicBounds.minY + line.glyphOrigin.y
+                    baseline: origin.y + frame.minY + baseline
                 ))
             }
             return true

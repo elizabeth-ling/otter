@@ -17,6 +17,8 @@ import os
 /// Item paragraphs have no tab stops and a 0.001 pt tab interval, so hidden tabs take no space (the
 /// T18 spike: default stops push the text up to 80 pt; this lines up within 0.04 pt on TextKit 1
 /// and 2; an interval of 0 breaks TextKit 2's layout). A tab inside an item's text takes none either.
+/// An item with no text yet (`- `) is all hidden characters, which TextKit 2 lays out 0 pt tall,
+/// so item paragraphs have a minimum line height of one line of the editor's font.
 @MainActor
 final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// The editor's font. Bold and italic are its faces; changing it restyles everything.
@@ -25,6 +27,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             fonts.removeAll()
             markerWidths.removeAll()
             paragraphStyles.removeAll()
+            measuredLine = nil
             restyleAll()
         }
     }
@@ -55,6 +58,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     private var itemSelection = NSRange(location: 0, length: 0)
     private var markerWidths: [String: CGFloat] = [:]
     private var paragraphStyles: [ListStyle: NSParagraphStyle] = [:]
+    private var measuredLine: LineMetrics?
 
     init(font: NSFont) {
         self.font = font
@@ -105,6 +109,34 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
     private static let bulletTextOffset: CGFloat = 1.34
     private static let taskTextOffset: CGFloat = 1.75
+
+    /// A line of the editor's font as TextKit 2 lays it out: its height, and its baseline from its top.
+    struct LineMetrics {
+        let height: CGFloat
+        let baseline: CGFloat
+    }
+
+    /// One line of the editor's font, measured in a scratch TextKit 2 layout. An item with no text
+    /// has no glyphs to take a baseline from, so its bullet or circle sits on this one.
+    var lineMetrics: LineMetrics {
+        if let measuredLine {
+            return measuredLine
+        }
+        let content = NSTextContentStorage()
+        let layout = NSTextLayoutManager()
+        content.addTextLayoutManager(layout)
+        layout.textContainer = NSTextContainer(size: CGSize(width: 1000, height: 1000))
+        content.attributedString = NSAttributedString(string: "x", attributes: [.font: font, .paragraphStyle: Self.tablessParagraph])
+        layout.ensureLayout(for: layout.documentRange)
+        let metrics: LineMetrics
+        if let fragment = layout.textLayoutFragment(for: layout.documentRange.location), let line = fragment.textLineFragments.first {
+            metrics = LineMetrics(height: fragment.layoutFragmentFrame.height, baseline: line.typographicBounds.minY + line.glyphOrigin.y)
+        } else {
+            metrics = LineMetrics(height: ceil(font.ascender - font.descender + font.leading), baseline: ceil(font.ascender))
+        }
+        measuredLine = metrics
+        return metrics
+    }
 
     /// `string`'s width in the editor's font, tabs taking no space as in an item.
     func width(of string: String) -> CGFloat {
@@ -381,6 +413,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         style.headIndent = textStart
         let markerWidth = list.revealedMarker.map { width(of: $0) } ?? 0
         style.firstLineHeadIndent = max(textStart - markerWidth, levelStart(level: list.level))
+        style.minimumLineHeight = lineMetrics.height
         paragraphStyles[list] = style
         return style
     }

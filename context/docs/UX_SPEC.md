@@ -133,22 +133,22 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 ### Lists and tasks
 
-`- ` bullets and `- [ ]` tasks look like a list, and the note stays plain Markdown (ADR-017, T18). As in Obsidian, the line you're on shows its marker as dimmed raw text, and every other line shows the rendered bullet or box.
+`- ` bullets and `- [ ]` tasks look like a list, and the note stays plain Markdown (ADR-017, ADR-018, T18). As in Obsidian, typing `- ` shows a bullet straight away and `- [ ] ` a circle, on the line you're on too; the raw marker shows only while the caret is in it.
 
 | Markdown, at a line's start | Shown as |
 |---|---|
 | `- item` | `•` item |
-| `- [ ] task` | ☐ task |
-| `- [x] done`, `- [X] done` | ☑ done, dimmed and struck through |
+| `- [ ] task` | ○ task |
+| `- [x] done`, `- [X] done` | ✓ in an accent-filled circle; done, dimmed and struck through |
 
 - A line counts when its indentation is followed by `-` and one space. A task also needs the space after `]`. These show as typed: a lone `-`, `---`, `*` / `+` / numbered lists, lists in a `>` quote, and lines inside a fence.
-- Each nesting level indents one step, and wrapped lines hang under the item's text. An item is one level deeper than the nearest item above it with less indentation, so lists indented with 2 spaces, 4 spaces or tabs all nest. The indentation characters are always hidden.
-- On the line with the caret, and on every line a selection touches, the marker shows as raw text (`- `, `- [ ] `, `- [x] `) in `tertiaryLabelColor`. It hangs in the gutter, so the text doesn't move. On every other line the marker is hidden and a `•` or box is drawn instead. The lines swap live as the caret moves, and after `↩` continues a list the new line shows a dimmed `- `.
-- Arriving on an item line from elsewhere (click, `↑` / `↓`, `→`, `⌘←`) puts the caret at the start of the item's text, so typing goes into the item. Once the marker shows, it's ordinary text: `←` steps into it, and you can edit `- [ ]` directly. Hidden indentation is skipped, and a selection that includes the `-` takes the indentation with it (`⌘A` then `⌫` empties the note).
+- Each nesting level indents 1.34 em, the same as from plain text to a bullet's text; a task's text starts at 1.75 em. The bullet is a grey dot 0.28 em across and the checkbox a grey ring 0.94 em across, both centred 0.87 em in (measured from Obsidian). Wrapped lines hang under the item's text. An item is one level deeper than the nearest item above it with less indentation, so lists indented with 2 spaces, 4 spaces or tabs all nest. The indentation characters are always hidden.
+- While the caret is in an item's marker (`←` from the start of its text steps in), or a selection includes part of it, the marker shows as raw text (`- `, `- [ ] `, `- [x] `) in `tertiaryLabelColor`. `- ` hangs left of the text; `- [ ] ` pushes the text right, as in Obsidian. Otherwise the marker is hidden and a bullet or circle is drawn, including on the caret line, so after `↩` continues a list the new line shows a bullet straight away.
+- Arriving on an item line from elsewhere (click, `↑` / `↓`, `→`, `⌘←`) puts the caret at the start of the item's text, so typing goes into the item. `←` from there steps into the marker, which then shows as ordinary text, and you can edit `- [ ]` directly. Hidden indentation is skipped, and a selection that includes the `-` takes the indentation with it (`⌘A` then `⌫` empties the note).
 - `↩` continues the list with the same indentation. A new task is always unchecked, and text after the caret moves to the new item. `↩` on an empty item outdents it if it's nested, or otherwise removes the marker and ends the list.
 - `⌫` at the start of an item's text removes its marker (all of `- [ ] ` for a task) and keeps the indentation. `⌦` at the end of an item joins the next item's text onto it.
 - `Tab` / `⇧Tab` in an item indent it under the item above / outdent it back to its parent's indentation, using tab characters. Elsewhere `Tab` still inserts a tab.
-- Clicking a drawn box (on a line without the caret) ticks or unticks it, writing `[x]` or `[ ]`, without moving the caret. On the caret line the raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it. Each list action is one `⌘Z` step.
+- Clicking a drawn circle ticks or unticks it, writing `[x]` or `[ ]`, without moving the caret, on any line. A revealed raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it. Each list action is one `⌘Z` step.
 - Paste inserts text as it does now and never adds markers. Copying across lines includes the markers. While an input method is composing, `↩` and `Tab` go to it.
 
 ## 2. Keyboard map

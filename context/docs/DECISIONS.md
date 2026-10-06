@@ -196,7 +196,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-017 · `-` bullets and `- [ ]` tasks show as bullets and checkboxes (amends ADR-016)
+## ADR-017 · `-` bullets and `- [ ]` tasks show as bullets and checkboxes (amends ADR-016) — **Caret-line reveal and look replaced by ADR-018**
 
 **Context.** ADR-016 styles inline Markdown only, so list markers show as typed. The product owner wants `- ` lists and `- [ ]` checkboxes to look and behave like lists, as they do in Obsidian. ADR-007 left `- [ ]` tinting open as a later addition.
 
@@ -211,3 +211,15 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - Arriving on an item line from another line puts the caret after the marker, so typing goes into the item. Once the marker is revealed, it's ordinary text. `↩` continues the list, or ends it on an empty item. `⌫` at the start of the text removes the marker. `Tab` / `⇧Tab` nest and un-nest. `⌘L` toggles a task (Obsidian's default shortcut) and `⇧⌘8` toggles a bullet. These rules are pure OtterCore functions (`MarkdownLists`, `HiddenMarkerEditing`) with tests.
 
 **Consequences.** `EditorTextView` takes on custom drawing and a mouse hit-test for checkboxes. Hidden leading tabs need care: a tab advances to the next tab stop whatever its font (T18 spikes a fix). A hidden prefix snaps forward on arrival while inline runs snap back, so `HiddenMarkerEditing` must keep them apart and know which lines are revealed. Other bullets, numbering and lists in quotes can follow the same pattern later.
+
+## ADR-018 · Lists render on the caret line too; Obsidian's spacing, circles for tasks (amends ADR-017)
+
+**Context.** ADR-017 showed the raw marker on the caret line and drew a bullet or box only once the caret left, with the text in a gutter wide enough for `- [x] `. In Obsidian itself, typing `- ` shows a bullet straight away, and the product owner wants that, plus circular checkboxes, bigger bullets and Obsidian's spacing (reference: `context/ui/obsidian-reference.png`).
+
+**Decision.**
+- Bullets and circles are drawn on every line, the caret line included. An item's marker shows raw (dimmed) only while the caret is in its prefix, before the start of its text, or a selection has a character of it (`MarkdownListItem.revealsMarker(for:)`). `←` from the start of an item's text steps into the marker, which reveals it. Arriving on an item still puts the caret at the start of its text, where nothing is revealed.
+- Spacing and sizes in em of the editor font, measured from the reference: a level is 1.34 em; a bullet's text starts 1.34 em past its level, a task's 1.75 em; the bullet is a solid `tertiaryLabelColor` dot 0.28 em across on the x-height's middle; a task is a 0.94 em circle on the capitals' middle, a `tertiaryLabelColor` ring or filled with the accent colour and a white check. Both are centred 0.87 em past the level's start.
+- A revealed `- ` hangs left of the text, which doesn't move; a revealed `- [ ] ` doesn't fit, so it starts at the level and pushes the first line's text right, as in Obsidian.
+- A click on a circle toggles it on any line, since it's drawn on the caret line too.
+
+**Consequences.** Revealing a task's marker can re-wrap its first line. The gutter is gone, so items sit as close to plain text as in Obsidian. ADR-017's other rules (keys, nesting, paste, undo, display-only) stand.
