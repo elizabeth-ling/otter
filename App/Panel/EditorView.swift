@@ -45,8 +45,9 @@ final class EditorView: NSScrollView {
         set { textView.onTextChange = newValue }
     }
 
-    /// Takes keyboard focus when the panel shows.
-    let textView = EditorTextView()
+    /// Takes keyboard focus when the panel shows. Asks for TextKit 2 explicitly: a subclass that
+    /// overrides `draw(_:)` otherwise starts on TextKit 1, where the list markers aren't drawn.
+    let textView = EditorTextView(usingTextLayoutManager: true)
 
     var text: String { textView.string }
 
