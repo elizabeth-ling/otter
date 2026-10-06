@@ -144,7 +144,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | `⇧⌘⌫` | Panel | Discard draft (and attachments) |
 | `⌘1` … `⌘9` | Panel | Choose destination for this note |
 | `⇧⌘O` | Panel | Change the save folder (same as clicking the folder name in the header) |
-| `⌘V` | Panel | Paste as plain text; files, then images become attachments (formatted text with a picture of itself stays text; concealed pasteboard content is never attached) |
+| `⌘V` | Panel | Paste as plain text; files, then images become attachments (formatted text with a picture of itself stays text; concealed or transient pasteboard content is never attached) |
 | `⇧⌥⌘V` | Panel | Paste with original formatting converted to Markdown *(stretch)* |
 | `⌘B` / `⌘I` | Panel | Bold `**…**` / italic `*…*` on the selection, or the word the caret is in; elsewhere inserts an empty pair with the caret between. Pressed again, removes it; with the caret at the end of a bold / italic span, moves it past the span so typing is plain |
 | `⇧⌘X` | Panel | Strikethrough `~~…~~`, the same way |
@@ -159,15 +159,34 @@ Clicking outside the panel closes it (keeps the draft). Setting: "Keep panel ope
 
 ## 3. Save-clipboard HUD
 
-A small non-interactive pill near the bottom center of the active screen, visible ~1.2 s:
+A small non-interactive pill near the bottom center of the screen with the pointer, visible ~1.2 s:
 
 ```
         ┌─────────────────────────────────┐
-        │  ✓  Saved to Daily note         │
+        │  ✓  Saved to Otter Inbox        │
         └─────────────────────────────────┘
 ```
 
-Error variant: "✕ Clipboard is empty" / "✕ Skipped — clipboard came from a password manager".
+The hotkey and the menu bar's "Save Clipboard" save what's on the clipboard to the default destination, read in the same order as `⌘V` in the panel: files, then an image, then text. ✓ shows once the outbox has the note; delivery is in the background, as for the panel.
+
+| Message | When |
+|---|---|
+| ✓ Saved to {destination} | Saved. "· 2 files skipped" is added when some copied files couldn't be attached (a folder, over 200 MB, past 10) |
+| ✓ Already saved | The same clipboard (`changeCount`) was saved less than 10 s ago |
+| ✕ Clipboard is empty | No file, no image Otter attaches, no text that isn't only whitespace |
+| ✕ Skipped — copied from a password manager | The clipboard is marked `org.nspasteboard.ConcealedType` or `TransientType`; it's never read |
+| ✕ {reason} | None of the files or the image could be attached, e.g. "“talk.mov” is over 200 MB, so it can't be attached." |
+| ✕ Not saved — no destination set up / disk is full / couldn't write to Otter's outbox | The outbox didn't take the note |
+
+| Property | Value |
+|---|---|
+| Size | 40 pt tall, as wide as the message (truncated 16 pt from the screen's sides); fully rounded ends |
+| Position | Centred, its bottom 72 pt above the bottom of the visible frame (above the Dock) |
+| Content | SF Symbol `checkmark.circle.fill` (green) or `xmark.circle.fill` (secondary), then the message in the 14 pt medium system font |
+| Background | `.hudWindow` vibrancy; solid with Reduce Transparency |
+| Animation | 150 ms fade-in, 300 ms fade-out; none with Reduce Motion |
+| Repeat | A new message replaces the one showing, moves to the pointer's screen and restarts the 1.2 s |
+| VoiceOver | The message is announced (high priority), without the symbol |
 
 ## 4. Menu bar
 

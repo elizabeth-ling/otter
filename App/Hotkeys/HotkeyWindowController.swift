@@ -58,6 +58,11 @@ private struct HotkeyRecorderView: View {
                 if let saveClipboardNote {
                     warning(saveClipboardNote)
                 }
+                // The suggested shortcut (UX_SPEC §2); it ships unset (ADR-011).
+                Button("Use ⌥⇧Space") {
+                    KeyboardShortcuts.setShortcut(.init(.space, modifiers: [.option, .shift]), for: .saveClipboard)
+                    saveClipboardNote = note(for: hotkeys.shortcutDidChange(for: .saveClipboard), otherAction: "Toggle panel")
+                }
             }
 
             Section {

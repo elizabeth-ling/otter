@@ -22,7 +22,14 @@ final class CaptureService {
         self.destinations = destinations
     }
 
-    /// Journals the note and starts delivering it.
+    /// Why a note isn't in the outbox.
+    enum SubmitError: Error {
+        case noDestination
+        /// The outbox write failed; nothing was kept and the staged files are untouched.
+        case outbox(any Error)
+    }
+
+    /// Journals the note and starts delivering it. A failure goes to `onCaptureFailed`.
     /// - Parameters:
     ///   - file: The file chosen in the `⌘S` Save panel (T16), whose name becomes the note's title.
     ///     `nil` for an unnamed note, which the destination names.
@@ -36,10 +43,30 @@ final class CaptureService {
         destinationID: DestinationID? = nil,
         source: Capture.Source = .panel
     ) async -> Bool {
-        guard let destinationID = destinationID ?? destinations.defaultID else {
-            Logger.pipeline.error("Capture not saved: no destination is configured")
+        switch await enqueue(text: text, saveAs: file, attachments: attachments, destinationID: destinationID, source: source) {
+        case .success:
+            return true
+        case .failure(.noDestination):
             onCaptureFailed?(CaptureFailure.noDestinationMessage)
             return false
+        case let .failure(.outbox(error)):
+            onCaptureFailed?(CaptureFailure.message(for: error))
+            return false
+        }
+    }
+
+    /// Journals the note and starts delivering it, like `submit`, but leaves a failure to the caller
+    /// rather than the panel: the save-clipboard HUD shows it (T11).
+    func enqueue(
+        text: String,
+        saveAs file: URL? = nil,
+        attachments: [StagedAttachment] = [],
+        destinationID: DestinationID? = nil,
+        source: Capture.Source
+    ) async -> Result<Void, SubmitError> {
+        guard let destinationID = destinationID ?? destinations.defaultID else {
+            Logger.pipeline.error("Capture not saved: no destination is configured")
+            return .failure(.noDestination)
         }
 
         let capture = Capture(
@@ -54,13 +81,12 @@ final class CaptureService {
             try await outbox.enqueue(capture, attachmentFiles: attachments.map(\.file))
         } catch {
             Logger.pipeline.error("Capture \(capture.id, privacy: .public) not saved: \(error.loggableCode, privacy: .public)")
-            onCaptureFailed?(CaptureFailure.message(for: error))
-            return false
+            return .failure(.outbox(error))
         }
 
-        Logger.pipeline.info("Captured \(capture.id, privacy: .public) (\(capture.text.utf8.count, privacy: .public) bytes, \(capture.attachments.count, privacy: .public) attachment(s)) for \(destinationID, privacy: .public)")
+        Logger.pipeline.info("Captured \(capture.id, privacy: .public) from \(source.rawValue, privacy: .public) (\(capture.text.utf8.count, privacy: .public) bytes, \(capture.attachments.count, privacy: .public) attachment(s)) for \(destinationID, privacy: .public)")
         onCaptured?()
         await delivery.kick()
-        return true
+        return .success(())
     }
 }

@@ -704,10 +704,10 @@ final class EditorTextView: NSTextView {
         }
     }
 
-    /// The clipboard's text for `⌘K`. Concealed content (a password) is never put in a note.
+    /// The clipboard's text for `⌘K`. Concealed or transient content (a password) is never put in a note.
     private static func clipboardText() -> String? {
         let pasteboard = NSPasteboard.general
-        guard !(pasteboard.types ?? []).contains(NSPasteboard.PasteboardType(PasteRules.concealedType)) else {
+        guard !PasteRules.isPrivate(types: pasteboard.types?.map(\.rawValue) ?? []) else {
             return nil
         }
         return pasteboard.string(forType: .string)

@@ -16,6 +16,16 @@ public enum PasteRules {
     /// (nspasteboard.org). Never kept as an attachment.
     public static let concealedType = "org.nspasteboard.ConcealedType"
 
+    /// Marks content that's only on the pasteboard for a moment and shouldn't be kept
+    /// (nspasteboard.org). Password managers and clipboard tools use it. Treated like `concealedType`.
+    public static let transientType = "org.nspasteboard.TransientType"
+
+    /// The pasteboard is marked concealed or transient: never attached, never saved by the clipboard
+    /// hotkey (T11), never used by `⌘K`. Decided from the types alone, so the content is never read.
+    public static func isPrivate(types: [String]) -> Bool {
+        types.contains(concealedType) || types.contains(transientType)
+    }
+
     /// Image types in the order they're preferred. TIFF comes last: apps often add it next to a
     /// PNG, and it's converted to PNG anyway.
     public static let imageTypes = ["public.png", "public.jpeg", "public.heic", "public.tiff"]
@@ -26,7 +36,7 @@ public enum PasteRules {
 
     /// In order: files, then image data, then text.
     ///
-    /// - Concealed content is only ever text.
+    /// - Concealed or transient content (`isPrivate`) is only ever text.
     /// - Image data alongside formatted text and plain text is a copied text selection, so it's
     ///   text. Image data alone, or with only a URL or HTML (a browser's "Copy Image"), is an image.
     ///
@@ -35,7 +45,7 @@ public enum PasteRules {
     ///   - hasFileURLs: It holds at least one `file://` URL.
     ///   - hasText: It holds plain text that isn't only whitespace.
     public static func kind(types: [String], hasFileURLs: Bool, hasText: Bool) -> PasteKind {
-        guard !types.contains(concealedType) else {
+        guard !isPrivate(types: types) else {
             return .text
         }
         if hasFileURLs {

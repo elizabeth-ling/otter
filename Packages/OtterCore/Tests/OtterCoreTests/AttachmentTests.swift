@@ -71,6 +71,9 @@ func filesKeepTheirNameMadeSafe(original: String, expected: String) {
     // A password manager's copy.
     (["org.nspasteboard.ConcealedType", "public.png"], false, false, .text),
     (["org.nspasteboard.ConcealedType", "public.file-url"], true, false, .text),
+    // Content that's only on the pasteboard for a moment is treated the same way (T11).
+    (["org.nspasteboard.TransientType", "public.png"], false, false, .text),
+    (["org.nspasteboard.TransientType", "public.file-url"], true, false, .text),
     (["public.utf8-plain-text"], false, true, .text),
 ])
 func pasteKinds(types: [String], hasFileURLs: Bool, hasText: Bool, expected: PasteKind) {

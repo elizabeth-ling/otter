@@ -11,13 +11,21 @@ final class StatusItemController {
     private let folderChooser: FolderChooser?
     private let vaultMenu: ObsidianVaultMenu?
     private let recents: RecentStore?
+    private let clipboardCapture: ClipboardCapture?
 
-    init(hotkeyWindowController: HotkeyWindowController, panelController: PanelController, folderChooser: FolderChooser?, recents: RecentStore?) {
+    init(
+        hotkeyWindowController: HotkeyWindowController,
+        panelController: PanelController,
+        folderChooser: FolderChooser?,
+        recents: RecentStore?,
+        clipboardCapture: ClipboardCapture?
+    ) {
         self.hotkeyWindowController = hotkeyWindowController
         self.panelController = panelController
         self.folderChooser = folderChooser
         vaultMenu = folderChooser.map(ObsidianVaultMenu.init(folderChooser:))
         self.recents = recents
+        self.clipboardCapture = clipboardCapture
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         let image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: "Otter")
@@ -25,6 +33,12 @@ final class StatusItemController {
         statusItem.button?.image = image
 
         let menu = NSMenu()
+        // First, as in UX_SPEC §4 until T12 adds New Note above it. T12 adds the shortcut hints.
+        if clipboardCapture != nil {
+            let saveClipboardItem = menu.addItem(withTitle: "Save Clipboard", action: #selector(saveClipboard(_:)), keyEquivalent: "")
+            saveClipboardItem.target = self
+            menu.addItem(.separator())
+        }
         // Until destination settings land (T10).
         if let folderChooser {
             let folderItem = menu.addItem(withTitle: "Choose Folder…", action: #selector(FolderChooser.chooseFolder(_:)), keyEquivalent: "")
@@ -50,6 +64,11 @@ final class StatusItemController {
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
+    }
+
+    /// The same path as the save-clipboard hotkey (T11).
+    @objc private func saveClipboard(_ sender: Any?) {
+        clipboardCapture?.save()
     }
 
     #if DEBUG

@@ -47,7 +47,8 @@ Otter/
 │   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
 │   ├── Panel/AttachmentChips.swift   # chips row above the footer: thumbnail or icon, name, size, ✕ (T09)
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
-│   ├── HUD/HUDController.swift
+│   │          ClipboardCapture.swift   # save-clipboard hotkey + menu item: pasteboard → staged files → outbox → HUD (T11)
+│   ├── HUD/HUDController.swift   # click-through pill near the bottom of the pointer's screen (T11)
 │   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10; also opened from the panel header (T17)
 │   │          ObsidianVaultMenu.swift   # "Use Obsidian Vault ▸" until T10 (T07)
 │   │          ObsidianLink+Open.swift   # open a note in Obsidian, or reveal it in Finder (T07)
@@ -70,6 +71,7 @@ Otter/
     │   │          MarkdownStyling.swift      # inline Markdown → spans: kind, content and marker ranges (UTF-16) (ADR-016)
     │   │          HiddenMarkerEditing.swift  # caret stops, deletions, typing over a selection, line-break splits, copied Markdown (ADR-016)
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
+    │   ├── Clipboard/ClipboardSave.swift, HUDPlacement.swift   # what the clipboard holds, HUD messages, "Already saved" window, HUD frame (T11)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
     │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
     │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core

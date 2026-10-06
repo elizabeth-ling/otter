@@ -30,9 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let destinations = capturePipeline?.destinations
         let captureService = capturePipeline?.captureService
         let folderChooser = capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
+        // One stager for `drafts/files/`, shared with the clipboard hotkey, so the panel's launch sweep
+        // never removes a file the hotkey staged this session.
+        let attachmentStager = AttachmentStager(directory: StorageLocations.draftFiles)
         let panel = PanelController(
             draftStore: DraftStore(fileURL: StorageLocations.draft),
-            attachmentStager: AttachmentStager(directory: StorageLocations.draftFiles)
+            attachmentStager: attachmentStager
         ) {
             guard let config = destinations?.defaultID.flatMap({ destinations?.config(for: $0) }) else {
                 return PanelDestination(name: "No destination")
@@ -53,13 +56,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panelController = panel
 
+        // The HUD's panel is built on its first message, not here.
+        let clipboardCapture = capturePipeline.map {
+            ClipboardCapture(captureService: $0.captureService, destinations: $0.destinations, stager: attachmentStager, hud: HUDController())
+        }
+
         let hotkeys = HotkeyService()
         hotkeys.onTogglePanel = {
             panel.toggle()
         }
-        // Until clipboard capture lands (T11).
         hotkeys.onSaveClipboard = {
-            Logger.hotkey.info("Save clipboard hotkey pressed")
+            clipboardCapture?.save()
         }
         hotkeys.start()
         hotkeyService = hotkeys
@@ -68,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
             panelController: panel,
             folderChooser: folderChooser,
-            recents: capturePipeline?.recents
+            recents: capturePipeline?.recents,
+            clipboardCapture: clipboardCapture
         )
     }
 
