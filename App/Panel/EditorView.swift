@@ -56,6 +56,7 @@ final class EditorView: NSScrollView {
         set {
             textView.font = newValue
             styler.font = newValue
+            textView.listMarkersDidChange()
         }
     }
 
@@ -178,6 +179,11 @@ final class EditorTextView: NSTextView {
     private var isExtendingSelection = false
     /// Set while a movement runs only to measure what a word or line delete would remove.
     private var isMeasuring = false
+    /// Set while an edit's computed selection is applied: list markers on its lines count as
+    /// revealed, so it isn't snapped as an arrival.
+    private var isSelectingEditResult = false
+    /// SF Symbol boxes for tasks, at the editor font's size.
+    private var checkboxImages: (pointSize: CGFloat, empty: NSImage, checked: NSImage)?
 
     /// Dragging in the text selects text; it never moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
@@ -230,7 +236,7 @@ final class EditorTextView: NSTextView {
 
     override func didChangeText() {
         super.didChangeText()
-        needsDisplay = true
+        listMarkersDidChange()
         onTextChange?()
     }
 
@@ -282,6 +288,15 @@ final class EditorTextView: NSTextView {
             applyFormatting(style)
             return true
         }
+        // `⌘L` toggles a task, `⇧⌘8` a bullet (T18). The `8` key by code: some layouts give `*`.
+        if flags == .command, key == "l" {
+            applyListCommand(.toggleTask, actionName: "Task")
+            return true
+        }
+        if flags == [.command, .shift], event.keyCode == Self.eightKeyCode {
+            applyListCommand(.toggleBullet, actionName: "Bullet")
+            return true
+        }
 
         // Otter is never the active app, so the Edit menu may not see these. Sent to the first
         // responder (this view, then the window for undo and redo).
@@ -329,6 +344,51 @@ final class EditorTextView: NSTextView {
         apply(edit, actionName: Self.actionNames[style] ?? "Format", beforeSelecting: prepareSelection)
     }
 
+    // MARK: Lists (ADR-017)
+
+    /// `⌘L`, `⇧⌘8`, `Tab` and `⇧Tab` as one edit, or a beep if `MarkdownLists` refuses.
+    private func applyListCommand(_ command: ListCommand, actionName: String) {
+        guard let edit = MarkdownLists.apply(command, to: string, selection: selectedRange()) else {
+            NSSound.beep()
+            return
+        }
+        applyListEdit(edit, actionName: actionName)
+    }
+
+    /// Whether the caret or selection is on a list item's line, where `Tab` and `⇧Tab` nest.
+    private func selectionTouchesItems() -> Bool {
+        guard let styler, !hasMarkedText() else {
+            return false
+        }
+        let selection = selectedRange()
+        return styler.currentItems().contains { $0.isOnLine(touchedBy: selection) }
+    }
+
+    /// In a list item, `Tab` nests it under the item above (or beeps); elsewhere it inserts a tab.
+    override func insertTab(_ sender: Any?) {
+        guard selectionTouchesItems() else {
+            super.insertTab(sender)
+            return
+        }
+        applyListCommand(.indent, actionName: "Indent")
+    }
+
+    /// In a list item, `⇧Tab` outdents it (or beeps at the top level); elsewhere it does nothing.
+    override func insertBacktab(_ sender: Any?) {
+        guard selectionTouchesItems() else {
+            super.insertBacktab(sender)
+            return
+        }
+        applyListCommand(.outdent, actionName: "Outdent")
+    }
+
+    /// Redraws the bullets and boxes, and their arrow cursor, after the text, the reveal or the
+    /// font changed.
+    fileprivate func listMarkersDidChange() {
+        needsDisplay = true
+        window?.invalidateCursorRects(for: self)
+    }
+
     // MARK: Hidden markers (ADR-016)
 
     /// The editing rules for the text as it is now, or `nil` while an input method is composing.
@@ -336,7 +396,14 @@ final class EditorTextView: NSTextView {
         guard let styler, !hasMarkedText() else {
             return nil
         }
-        return HiddenMarkerEditing(text: string, spans: styler.currentSpans(), revealing: isLinkRevealed ? selectedRange() : nil)
+        let selection = selectedRange()
+        return HiddenMarkerEditing(
+            text: string,
+            spans: styler.currentSpans(),
+            items: styler.currentItems(),
+            revealing: isLinkRevealed ? selection : nil,
+            selection: selection
+        )
     }
 
     /// Forgets the caret exceptions and the revealed link, e.g. when the text is replaced.
@@ -351,6 +418,11 @@ final class EditorTextView: NSTextView {
     /// Every selection change, from clicks, keys or code: a caret snaps to a caret stop (`caretStop`),
     /// a selection's ends move onto visible text (`trimmedSelection`), and a link shows raw while
     /// the selection is in its URL. Nothing snaps while an input method is composing.
+    ///
+    /// List markers snap as they looked before the move: arriving on an item from another line
+    /// lands at the start of its text, because its marker was still hidden. Then the lines the new
+    /// selection touches show their raw marker (ADR-017). An edit's own selection isn't an
+    /// arrival: it's placed as computed.
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
         guard !isMeasuring, !hasMarkedText(), let styler, ranges.count == 1, let proposed = ranges.first?.rangeValue else {
             super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
@@ -359,7 +431,13 @@ final class EditorTextView: NSTextView {
         let spans = styler.currentSpans()
         let reveal = (isLinkRevealed || revealsNextLink) && MarkdownStyling.link(in: spans, withDestinationHolding: proposed) != nil
         revealsNextLink = false
-        let rules = HiddenMarkerEditing(text: string, spans: spans, revealing: reveal ? proposed : nil)
+        let rules = HiddenMarkerEditing(
+            text: string,
+            spans: spans,
+            items: styler.currentItems(),
+            revealing: reveal ? proposed : nil,
+            selection: isSelectingEditResult ? proposed : selectedRange()
+        )
 
         let selection: NSRange
         if proposed.length == 0 {
@@ -381,8 +459,31 @@ final class EditorTextView: NSTextView {
         super.setSelectedRanges([NSValue(range: selection)], affinity: affinity, stillSelecting: stillSelectingFlag)
         isLinkRevealed = reveal
         styler.reveal(reveal ? selection : nil)
+        if styler.revealItems(on: selection) {
+            listMarkersDidChange()
+        }
         // `NSTextView` takes the typing attributes from the text at the caret, which may be hidden.
         typingAttributes = styler.baseAttributes
+    }
+
+    /// `⌘←` on an item line goes to the start of its text, not to its revealed marker.
+    override func moveToLeftEndOfLine(_ sender: Any?) {
+        super.moveToLeftEndOfLine(sender)
+        moveToItemTextIfBeforeIt()
+    }
+
+    override func moveToBeginningOfLine(_ sender: Any?) {
+        super.moveToBeginningOfLine(sender)
+        moveToItemTextIfBeforeIt()
+    }
+
+    private func moveToItemTextIfBeforeIt() {
+        let selection = selectedRange()
+        guard selection.length == 0, let rules = hiddenMarkerRules(), let item = rules.item(onLineOf: selection.location),
+              selection.location < item.contentRange.location else {
+            return
+        }
+        setSelectedRange(NSRange(location: item.contentRange.location, length: 0))
     }
 
     override func moveLeft(_ sender: Any?) {
@@ -512,6 +613,9 @@ final class EditorTextView: NSTextView {
             : (selection.location < ns.length ? ns.rangeOfComposedCharacterSequence(at: selection.location) : nil)
         if edit.replacement.isEmpty, edit.range == plain {
             native()
+        } else if rules.item(onLineOf: selection.location) != nil {
+            // Taking a marker off, or joining items.
+            applyListEdit(edit, actionName: nil)
         } else {
             apply(edit, actionName: nil)
         }
@@ -596,7 +700,7 @@ final class EditorTextView: NSTextView {
     }
 
     /// `↩` inside a span closes it and opens it again on the new line; at its end, the break goes
-    /// after the closing marker.
+    /// after the closing marker. In a list item it continues the list, or ends it on an empty item.
     override func insertNewline(_ sender: Any?) {
         insertLineBreak { super.insertNewline(sender) }
     }
@@ -614,6 +718,8 @@ final class EditorTextView: NSTextView {
         let edit = rules.lineBreak(at: selection)
         if edit.range == selection, edit.replacement == "\n" {
             native()
+        } else if selection.length == 0, rules.item(onLineOf: selection.location) != nil {
+            applyListEdit(edit, actionName: nil)
         } else {
             apply(edit, actionName: nil)
         }
@@ -649,9 +755,10 @@ final class EditorTextView: NSTextView {
     }
 
     /// One undoable edit through `shouldChangeText` / `replaceCharacters` / `didChangeText`, so
-    /// `⌘Z` undoes it and the draft is saved, then its selection.
+    /// `⌘Z` undoes it and the draft is saved, then its selection (scrolled to unless `scrolls` is
+    /// false).
     @discardableResult
-    private func apply(_ edit: MarkdownEdit, actionName: String?, beforeSelecting prepare: () -> Void = {}) -> Bool {
+    private func apply(_ edit: MarkdownEdit, actionName: String?, scrolls: Bool = true, beforeSelecting prepare: () -> Void = {}) -> Bool {
         guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else {
             return false
         }
@@ -661,13 +768,27 @@ final class EditorTextView: NSTextView {
         }
         didChangeText()
         prepare()
+        isSelectingEditResult = true
         setSelectedRange(edit.selection)
-        scrollRangeToVisible(edit.selection)
+        isSelectingEditResult = false
+        if scrolls {
+            scrollRangeToVisible(edit.selection)
+        }
         return true
+    }
+
+    /// A list edit (ADR-017) as its own `⌘Z` step, apart from the typing around it.
+    private func applyListEdit(_ edit: MarkdownEdit, actionName: String?, scrolls: Bool = true) {
+        breakUndoCoalescing()
+        apply(edit, actionName: actionName, scrolls: scrolls)
+        breakUndoCoalescing()
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        for marker in listMarkers(in: dirtyRect) {
+            draw(marker)
+        }
         guard string.isEmpty, !hasMarkedText(), !placeholder.isEmpty else {
             return
         }
@@ -678,6 +799,193 @@ final class EditorTextView: NSTextView {
         let padding = textContainer?.lineFragmentPadding ?? 0
         let origin = NSPoint(x: textContainerOrigin.x + padding, y: textContainerOrigin.y)
         (placeholder as NSString).draw(at: origin, withAttributes: attributes)
+    }
+
+    // MARK: Bullets and checkboxes (ADR-017)
+
+    /// A drawn bullet or box: an item whose line isn't revealed, where its first line sits.
+    private struct ListMarker {
+        let item: MarkdownListItem
+        /// The x of the item's text start, in view coordinates.
+        let textStart: CGFloat
+        /// The first line's baseline, in view coordinates.
+        let baseline: CGFloat
+    }
+
+    /// The bullets and boxes to draw in `rect`: the items there whose line the selection doesn't
+    /// touch. Uses TextKit 2's layout fragments only; touching `layoutManager` would switch the
+    /// view to TextKit 1.
+    private func listMarkers(in rect: NSRect) -> [ListMarker] {
+        guard let styler, let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else {
+            return []
+        }
+        let items = styler.currentItems()
+        guard !items.isEmpty else {
+            return []
+        }
+        let origin = textContainerOrigin
+        let padding = textContainer?.lineFragmentPadding ?? 0
+        let documentStart = content.documentRange.location
+        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
+        var markers: [ListMarker] = []
+        layoutManager.enumerateTextLayoutFragments(from: top, options: [.ensuresLayout]) { fragment in
+            let frame = fragment.layoutFragmentFrame
+            guard frame.minY + origin.y <= rect.maxY else {
+                return false
+            }
+            let location = content.offset(from: documentStart, to: fragment.rangeInElement.location)
+            if let item = Self.item(startingAt: location, in: items), !styler.isRevealed(item), let line = fragment.textLineFragments.first {
+                markers.append(ListMarker(
+                    item: item,
+                    textStart: origin.x + padding + styler.textStart(level: item.level),
+                    baseline: origin.y + frame.minY + line.typographicBounds.minY + line.glyphOrigin.y
+                ))
+            }
+            return true
+        }
+        return markers
+    }
+
+    private static func item(startingAt location: Int, in items: [MarkdownListItem]) -> MarkdownListItem? {
+        var low = 0
+        var high = items.count
+        while low < high {
+            let middle = (low + high) / 2
+            if items[middle].lineRange.location < location {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        return low < items.count && items[low].lineRange.location == location ? items[low] : nil
+    }
+
+    /// `•` in `secondaryLabelColor` where the `-` would be, or a box in the accent colour, sized
+    /// from the editor font and sitting on the first line's baseline.
+    private func draw(_ marker: ListMarker) {
+        guard let styler else {
+            return
+        }
+        switch marker.item.kind {
+        case .bullet:
+            let bullet = "•"
+            let x = marker.textStart - styler.width(of: "- ") + (styler.width(of: "-") - styler.width(of: bullet)) / 2
+            drawText(bullet, at: CGPoint(x: x, y: marker.baseline), color: .secondaryLabelColor, font: styler.font)
+        case let .task(checked):
+            guard let images = checkboxImages(for: styler.font) else {
+                return
+            }
+            (checked ? images.checked : images.empty).draw(in: boxRect(for: marker), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+    }
+
+    /// Draws `string` with its baseline at `point` (this view is flipped).
+    private func drawText(_ string: String, at point: CGPoint, color: NSColor, font: NSFont) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return
+        }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
+        context.saveGState()
+        context.setFillColor(color.cgColor)
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        context.textPosition = point
+        CTLineDraw(line, context)
+        context.restoreGState()
+    }
+
+    /// A task's box: in the gutter, 0.4 em left of the text, centred on the capitals.
+    private func boxRect(for marker: ListMarker) -> NSRect {
+        guard let styler, let images = checkboxImages(for: styler.font) else {
+            return .zero
+        }
+        let size = images.empty.size
+        let font = styler.font
+        let midX = marker.textStart - 0.4 * font.pointSize - size.width / 2
+        let midY = marker.baseline - font.capHeight / 2
+        return NSRect(x: midX - size.width / 2, y: midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    /// Where a press on a box ticks it: the box, grown to at least 20 × 20 pt.
+    private func hitRect(for marker: ListMarker) -> NSRect {
+        let box = boxRect(for: marker)
+        return box.insetBy(dx: min(0, (box.width - 20) / 2), dy: min(0, (box.height - 20) / 2))
+    }
+
+    private func checkboxImages(for font: NSFont) -> (empty: NSImage, checked: NSImage)? {
+        if let cached = checkboxImages, cached.pointSize == font.pointSize {
+            return (cached.empty, cached.checked)
+        }
+        let configuration = NSImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.controlAccentColor]))
+        guard let empty = NSImage(systemSymbolName: "square", accessibilityDescription: nil)?.withSymbolConfiguration(configuration),
+              let checked = NSImage(systemSymbolName: "checkmark.square.fill", accessibilityDescription: nil)?.withSymbolConfiguration(configuration) else {
+            return nil
+        }
+        checkboxImages = (font.pointSize, empty, checked)
+        return (empty, checked)
+    }
+
+    /// The drawn box under `point`, if any. None while an input method is composing.
+    private func checkbox(at point: NSPoint) -> ListMarker? {
+        guard !hasMarkedText() else {
+            return nil
+        }
+        return listMarkers(in: visibleRect).first { $0.item.isTask && hitRect(for: $0).contains(point) }
+    }
+
+    /// A press on a drawn box ticks or unticks it on mouse-up inside the box, without moving the
+    /// caret. A press that turns into a drag selects text as usual.
+    override func mouseDown(with event: NSEvent) {
+        guard let window, let marker = checkbox(at: convert(event.locationInWindow, from: nil)) else {
+            super.mouseDown(with: event)
+            return
+        }
+        while let next = window.nextEvent(matching: [.leftMouseUp, .leftMouseDragged]) {
+            if next.type == .leftMouseUp {
+                if hitRect(for: marker).contains(convert(next.locationInWindow, from: nil)) {
+                    toggleCheckbox(marker.item)
+                }
+                return
+            }
+            let dx = next.locationInWindow.x - event.locationInWindow.x
+            let dy = next.locationInWindow.y - event.locationInWindow.y
+            if dx * dx + dy * dy > 9 {
+                super.mouseDown(with: event)
+                return
+            }
+        }
+    }
+
+    /// `[ ]` ↔ `[x]` as one undo step, the selection (and the scroll position) left alone.
+    private func toggleCheckbox(_ item: MarkdownListItem) {
+        guard let edit = MarkdownLists.toggleCheckbox(item, in: string, selection: selectedRange()) else {
+            return
+        }
+        applyListEdit(edit, actionName: item.isChecked ? "Uncheck" : "Check", scrolls: false)
+    }
+
+    /// The arrow over each drawn box.
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        for marker in listMarkers(in: visibleRect) where marker.item.isTask {
+            addCursorRect(hitRect(for: marker), cursor: .arrow)
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if checkbox(at: convert(event.locationInWindow, from: nil)) != nil {
+            NSCursor.arrow.set()
+        } else {
+            super.cursorUpdate(with: event)
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        if checkbox(at: convert(event.locationInWindow, from: nil)) != nil {
+            NSCursor.arrow.set()
+        }
     }
 
     // MARK: - Private
@@ -717,6 +1025,8 @@ final class EditorTextView: NSTextView {
     private static let returnKeyCodes: Set<UInt16> = [36, 76]
     /// Backspace.
     private static let deleteKeyCode: UInt16 = 51
+    /// The `8` key on the main row (`kVK_ANSI_8`).
+    private static let eightKeyCode: UInt16 = 28
 
     private struct EditShortcut: Hashable {
         let flags: UInt

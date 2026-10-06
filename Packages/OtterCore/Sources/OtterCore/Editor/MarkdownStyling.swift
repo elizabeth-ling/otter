@@ -74,6 +74,23 @@ public enum MarkdownStyling {
 
     /// The markers to hide, adjacent ones merged into one run (`**a**~~b~~` hides `**~~` as one),
     /// sorted. A link revealed by `selection` keeps its markers; spans inside its text don't.
+    ///
+    /// With `items`, each list item's run is added too (`MarkdownLists.hiddenRuns`): its prefix, or
+    /// only its indentation on a line `itemSelection` touches (ADR-017). A prefix run is never
+    /// merged with an inline one, so `- **b**` hides `- ` and `**` as two runs.
+    public static func hiddenRuns(
+        of spans: [MarkdownSpan],
+        revealing selection: NSRange? = nil,
+        items: [MarkdownListItem],
+        selection itemSelection: NSRange?
+    ) -> [NSRange] {
+        let inline = hiddenRuns(of: spans, revealing: selection)
+        let prefixes = MarkdownLists.hiddenRuns(of: items, selection: itemSelection)
+        return (inline + prefixes).sorted { $0.location < $1.location }
+    }
+
+    /// The markers to hide, adjacent ones merged into one run (`**a**~~b~~` hides `**~~` as one),
+    /// sorted. A link revealed by `selection` keeps its markers; spans inside its text don't.
     public static func hiddenRuns(of spans: [MarkdownSpan], revealing selection: NSRange? = nil) -> [NSRange] {
         let revealed = selection.flatMap { link(in: spans, withDestinationHolding: $0) }
         let markers = spans
@@ -105,67 +122,14 @@ private struct InlineParser {
         self.characters = characters
     }
 
-    // MARK: Lines and fences
+    // MARK: Lines
 
     mutating func parseDocument() {
-        var lineStart = 0
-        var fence: (marker: unichar, count: Int)?
-        while true {
-            var lineEnd = lineStart
-            while lineEnd < characters.count, !isNewline(characters[lineEnd]) {
-                lineEnd += 1
+        MarkdownLines(characters: characters).forEach { line in
+            if line.isProse {
+                parseLine(from: line.start, to: line.end)
             }
-            if let open = fence {
-                if closesFence(open, from: lineStart, to: lineEnd) {
-                    fence = nil
-                }
-            } else if let open = opensFence(from: lineStart, to: lineEnd) {
-                fence = open
-            } else {
-                parseLine(from: lineStart, to: lineEnd)
-            }
-            guard lineEnd < characters.count else {
-                break
-            }
-            let isCRLF = characters[lineEnd] == cr && lineEnd + 1 < characters.count && characters[lineEnd + 1] == lf
-            lineStart = lineEnd + (isCRLF ? 2 : 1)
         }
-    }
-
-    /// Up to three spaces, then three or more backticks or tildes. A backtick fence's info string
-    /// can't hold a backtick.
-    private func opensFence(from start: Int, to end: Int) -> (marker: unichar, count: Int)? {
-        let index = skippingIndent(from: start, to: end)
-        guard index < end, characters[index] == backtick || characters[index] == tilde else {
-            return nil
-        }
-        let marker = characters[index]
-        let count = run(of: marker, from: index, to: end)
-        guard count >= 3 else {
-            return nil
-        }
-        if marker == backtick, characters[(index + count)..<end].contains(backtick) {
-            return nil
-        }
-        return (marker, count)
-    }
-
-    /// The same marker, at least as many, and nothing after but spaces.
-    private func closesFence(_ fence: (marker: unichar, count: Int), from start: Int, to end: Int) -> Bool {
-        let index = skippingIndent(from: start, to: end)
-        let count = run(of: fence.marker, from: index, to: end)
-        guard count >= fence.count else {
-            return false
-        }
-        return characters[(index + count)..<end].allSatisfy { $0 == space || $0 == tab }
-    }
-
-    private func skippingIndent(from start: Int, to end: Int) -> Int {
-        var index = start
-        while index < end, index - start < 3, characters[index] == space {
-            index += 1
-        }
-        return index
     }
 
     // MARK: Inlines
@@ -573,6 +537,99 @@ private struct InlineParser {
             return Unicode.Scalar(scalarValue(lead: high, trail: characters[index + 1]))
         }
         return Unicode.Scalar(high)
+    }
+}
+
+// MARK: - Lines and fences
+
+/// The text's lines, and which are outside fenced code blocks. Shared by `MarkdownStyling` and
+/// `MarkdownLists`, so inline styles and list items agree on what's in a fence.
+struct MarkdownLines {
+    struct Line {
+        /// The line's first character.
+        let start: Int
+        /// The end of its text, before the line break.
+        let end: Int
+        /// The next line's start, after the line break (`end` on the last line).
+        let next: Int
+        /// Outside a fenced code block, and not a fence's own line.
+        let isProse: Bool
+    }
+
+    let characters: [unichar]
+
+    /// Every line in order, the last one even if empty.
+    func forEach(_ body: (Line) -> Void) {
+        var lineStart = 0
+        var fence: (marker: unichar, count: Int)?
+        while true {
+            var lineEnd = lineStart
+            while lineEnd < characters.count, !isNewline(characters[lineEnd]) {
+                lineEnd += 1
+            }
+            var isProse = false
+            if let open = fence {
+                if closesFence(open, from: lineStart, to: lineEnd) {
+                    fence = nil
+                }
+            } else if let open = opensFence(from: lineStart, to: lineEnd) {
+                fence = open
+            } else {
+                isProse = true
+            }
+            guard lineEnd < characters.count else {
+                body(Line(start: lineStart, end: lineEnd, next: lineEnd, isProse: isProse))
+                break
+            }
+            let isCRLF = characters[lineEnd] == cr && lineEnd + 1 < characters.count && characters[lineEnd + 1] == lf
+            let next = lineEnd + (isCRLF ? 2 : 1)
+            body(Line(start: lineStart, end: lineEnd, next: next, isProse: isProse))
+            lineStart = next
+        }
+    }
+
+    /// Up to three spaces, then three or more backticks or tildes. A backtick fence's info string
+    /// can't hold a backtick.
+    private func opensFence(from start: Int, to end: Int) -> (marker: unichar, count: Int)? {
+        let index = skippingIndent(from: start, to: end)
+        guard index < end, characters[index] == backtick || characters[index] == tilde else {
+            return nil
+        }
+        let marker = characters[index]
+        let count = run(of: marker, from: index, to: end)
+        guard count >= 3 else {
+            return nil
+        }
+        if marker == backtick, characters[(index + count)..<end].contains(backtick) {
+            return nil
+        }
+        return (marker, count)
+    }
+
+    /// The same marker, at least as many, and nothing after but spaces.
+    private func closesFence(_ fence: (marker: unichar, count: Int), from start: Int, to end: Int) -> Bool {
+        let index = skippingIndent(from: start, to: end)
+        let count = run(of: fence.marker, from: index, to: end)
+        guard count >= fence.count else {
+            return false
+        }
+        return characters[(index + count)..<end].allSatisfy { $0 == space || $0 == tab }
+    }
+
+    private func skippingIndent(from start: Int, to end: Int) -> Int {
+        var index = start
+        while index < end, index - start < 3, characters[index] == space {
+            index += 1
+        }
+        return index
+    }
+
+    private func run(of marker: unichar, from start: Int, to end: Int) -> Int {
+        var index = start
+        while index < end, characters[index] == marker {
+            index += 1
+        }
+        return index - start
     }
 }
 

@@ -7,7 +7,7 @@ Each task is sized to be one focused PR (roughly half a day to a day and a half)
 | Milestone | Done when | Tasks |
 |---|---|---|
 | **M0 — Walking skeleton** | You can press the hotkey (`⌥Space` by default, or `⌘Space` once Spotlight is moved off it) anywhere, type, hit `⌘↩`, and the note lands in a folder you chose. Point it at your Obsidian vault and start dogfooding. | T01 → T02 → T03 → T15 → T04 → T05 → T06 |
-| **M1 — Integrations** | Obsidian vault awareness, pasted images, save-clipboard hotkey, `⌘S` save-as, change the save folder from the panel header | T07, T09, T11, T16, T17 |
+| **M1 — Integrations** | Obsidian vault awareness, pasted images, save-clipboard hotkey, `⌘S` save-as, change the save folder from the panel header, bullets and checkboxes in the editor | T07, T09, T11, T16, T17, T18 |
 | **M2 — Ship it** | A stranger can download a notarized DMG, onboard in under a minute, and auto-update | T10, T12, T13, T14 |
 | **M3 — After v1** | Captures can go to Apple Notes, including onboarding, settings and the Recent menu (ADR-015) | T08 |
 
@@ -37,6 +37,7 @@ flowchart LR
   T06 --> T17[T17 Change folder from panel]
   T15 --> T17
   T17 --> T10
+  T04 --> T18[T18 Lists + checkboxes]
   T05 --> T12[T12 Menu bar + lifecycle]
   T10 --> T13[T13 Packaging]
   T12 --> T13

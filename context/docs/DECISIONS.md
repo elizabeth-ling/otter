@@ -76,7 +76,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-007 · Plain-text editor, no Markdown rendering in v1 — **Inline styling added by ADR-016**
+## ADR-007 · Plain-text editor, no Markdown rendering in v1 — **Inline styling added by ADR-016; lists and tasks by ADR-017**
 
 **Context.** Capture is about speed. Live Markdown rendering adds complexity, keystroke latency risk and edge cases (IME, undo).
 
@@ -178,7 +178,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-016 · The editor styles inline Markdown and hides its markers; notes stay plain Markdown (amends ADR-007)
+## ADR-016 · The editor styles inline Markdown and hides its markers; notes stay plain Markdown (amends ADR-007) — **Lists and tasks added by ADR-017**
 
 **Context.** The formatting shortcuts (`⌘B`, `⌘I`, `⇧⌘X`, `⌘E`, `⌘K`) put Markdown markers in a plain-text editor, so bolding a word shows `**word**` and nothing looks bold. The product owner wants bold to look bold, struck text struck through, and so on, with the markers out of sight. ADR-007 ruled out live rendering for latency, IME and undo reasons.
 
@@ -193,3 +193,21 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - VoiceOver reads the saved Markdown, markers included.
 
 **Consequences.** The editor looks like a rich-text editor for inline styles, so it has to behave like one: `EditorTextView` overrides caret movement, selection, deletion, typing over a selection, line breaks and copy, which is the riskiest part of the feature. ADR-007's concerns are handled rather than avoided: latency by the small, line-local re-attribution (budget in ARCHITECTURE §9), IME by waiting for composition to commit, undo by never touching characters outside the user's edit. Editing a link's URL needs `⌘K`. Emphasis doesn't span a line break, unlike Obsidian.
+
+---
+
+## ADR-017 · `-` bullets and `- [ ]` tasks show as bullets and checkboxes (amends ADR-016)
+
+**Context.** ADR-016 styles inline Markdown only, so list markers show as typed. The product owner wants `- ` lists and `- [ ]` checkboxes to look and behave like lists, as they do in Obsidian. ADR-007 left `- [ ]` tinting open as a later addition.
+
+**Options.** Tint the markers only, which keeps every character on screen · **hide the marker and draw a bullet or checkbox in its place**, the way ADR-016 hides inline markers · real rich-text lists (breaks "notes stay plain Markdown").
+
+**Decision.**
+- Outside a fence, a line made of indentation, `- ` and optionally `[ ] ` / `[x] ` / `[X] ` is a list item. Its indentation is always hidden, and the item is indented by its nesting level, with wrapped lines hanging under its text. Checked items are dimmed and struck through. `*`, `+` and numbered lists stay as typed.
+- **The caret line shows the raw marker, as in Obsidian.** On the line with the caret, or any line a selection touches, `- ` / `- [ ] ` shows as dimmed text, hanging in a gutter wide enough for `- [x] ` so the text never moves. Every other line hides the marker and draws `•` or a checkbox. This deliberately differs from ADR-016, where inline markers are always hidden. The product owner wants to see and edit the list syntax on the line being written, as in Obsidian. Two things make that cheap here, where ADR-016 rejected it for inline markers: a list marker sits at a fixed place at the start of a line, so the reveal re-attributes two lines when the caret changes line, not on every caret move; and the gutter keeps the reveal from re-wrapping anything. Inline markers stay always hidden.
+- A click on a drawn checkbox ticks it. On the caret line the raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it.
+- Nesting follows Markdown: an item is one level deeper than the nearest item above it with less indentation, so lists indented with 2 spaces, 4 spaces or tabs all nest. `Tab` indents with a tab character, Obsidian's default.
+- This is still display-only (ADR-016). The string, draft, outbox and file keep the exact Markdown. Ticking a box changes `[ ]` ↔ `[x]` in the text, as one undo step.
+- Arriving on an item line from another line puts the caret after the marker, so typing goes into the item. Once the marker is revealed, it's ordinary text. `↩` continues the list, or ends it on an empty item. `⌫` at the start of the text removes the marker. `Tab` / `⇧Tab` nest and un-nest. `⌘L` toggles a task (Obsidian's default shortcut) and `⇧⌘8` toggles a bullet. These rules are pure OtterCore functions (`MarkdownLists`, `HiddenMarkerEditing`) with tests.
+
+**Consequences.** `EditorTextView` takes on custom drawing and a mouse hit-test for checkboxes. Hidden leading tabs need care: a tab advances to the next tab stop whatever its font (T18 spikes a fix). A hidden prefix snaps forward on arrival while inline runs snap back, so `HiddenMarkerEditing` must keep them apart and know which lines are revealed. Other bullets, numbering and lists in quotes can follow the same pattern later.

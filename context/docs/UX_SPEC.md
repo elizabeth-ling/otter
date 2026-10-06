@@ -98,7 +98,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 - Styles combine: bold inside a link, struck-through italic. Nothing inside inline code is styled.
 - Rules follow CommonMark/GFM as Obsidian renders them, within one line: a span never crosses a line break; `\*` is a literal `*` (the backslash stays visible); `_` doesn't open or close inside a word (`snake_case_name` stays plain); an unclosed marker, or one with a space just inside (`** x **`), is plain text.
 - Lines inside a fenced code block (```` ``` ```` or `~~~`) aren't styled.
-- Not styled, shown as typed: headings, list and task markers, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML.
+- Not styled, shown as typed: headings, `*` / `+` bullets and numbered lists, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML. `- ` bullets and `- [ ]` tasks are covered under Lists and tasks below.
 - Follows the Font setting (§5): bold and italic are faces of the chosen font; with Monospaced, inline code keeps only its background.
 
 **When markers hide**
@@ -131,6 +131,26 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 - Spell checking works as before; hidden markers are punctuation and aren't checked. It still runs inside inline code.
 - VoiceOver reads the saved Markdown, markers included (ADR-016).
 
+### Lists and tasks
+
+`- ` bullets and `- [ ]` tasks look like a list, and the note stays plain Markdown (ADR-017, T18). As in Obsidian, the line you're on shows its marker as dimmed raw text, and every other line shows the rendered bullet or box.
+
+| Markdown, at a line's start | Shown as |
+|---|---|
+| `- item` | `•` item |
+| `- [ ] task` | ☐ task |
+| `- [x] done`, `- [X] done` | ☑ done, dimmed and struck through |
+
+- A line counts when its indentation is followed by `-` and one space. A task also needs the space after `]`. These show as typed: a lone `-`, `---`, `*` / `+` / numbered lists, lists in a `>` quote, and lines inside a fence.
+- Each nesting level indents one step, and wrapped lines hang under the item's text. An item is one level deeper than the nearest item above it with less indentation, so lists indented with 2 spaces, 4 spaces or tabs all nest. The indentation characters are always hidden.
+- On the line with the caret, and on every line a selection touches, the marker shows as raw text (`- `, `- [ ] `, `- [x] `) in `tertiaryLabelColor`. It hangs in the gutter, so the text doesn't move. On every other line the marker is hidden and a `•` or box is drawn instead. The lines swap live as the caret moves, and after `↩` continues a list the new line shows a dimmed `- `.
+- Arriving on an item line from elsewhere (click, `↑` / `↓`, `→`, `⌘←`) puts the caret at the start of the item's text, so typing goes into the item. Once the marker shows, it's ordinary text: `←` steps into it, and you can edit `- [ ]` directly. Hidden indentation is skipped, and a selection that includes the `-` takes the indentation with it (`⌘A` then `⌫` empties the note).
+- `↩` continues the list with the same indentation. A new task is always unchecked, and text after the caret moves to the new item. `↩` on an empty item outdents it if it's nested, or otherwise removes the marker and ends the list.
+- `⌫` at the start of an item's text removes its marker (all of `- [ ] ` for a task) and keeps the indentation. `⌦` at the end of an item joins the next item's text onto it.
+- `Tab` / `⇧Tab` in an item indent it under the item above / outdent it back to its parent's indentation, using tab characters. Elsewhere `Tab` still inserts a tab.
+- Clicking a drawn box (on a line without the caret) ticks or unticks it, writing `[x]` or `[ ]`, without moving the caret. On the caret line the raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it. Each list action is one `⌘Z` step.
+- Paste inserts text as it does now and never adds markers. Copying across lines includes the markers. While an input method is composing, `↩` and `Tab` go to it.
+
 ## 2. Keyboard map
 
 | Shortcut | Scope | Action |
@@ -150,6 +170,10 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | `⇧⌘X` | Panel | Strikethrough `~~…~~`, the same way |
 | `⌘E` | Panel | Inline code `` `…` ``, the same way |
 | `⌘K` | Panel | Link: `[selection](url)` with `url` selected to type over (the link shows raw while you do). A URL on the clipboard is used instead, caret after the link; a selected URL becomes `[](URL)` with the caret in the brackets. In an existing link, shows it raw and selects its URL |
+| `⌘L` | Panel | Task: makes the line, or each selected line, a `- [ ]` task; on a task, checks or unchecks it (T18) |
+| `⇧⌘8` | Panel | Bullet: adds `- ` to the line or selected lines; removes it if they're all list items already (T18) |
+| `Tab` / `⇧Tab` | Panel | In a list item: indent / outdent it. Elsewhere `Tab` inserts a tab (T18) |
+| `↩` | Panel | In a list item: continues the list. On an empty item, outdents it or ends the list (T18) |
 | `⌘,` | Panel | Open Settings |
 | `⌘Z` / `⇧⌘Z` | Panel | Undo / redo |
 
