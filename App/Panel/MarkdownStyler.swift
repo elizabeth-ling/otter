@@ -10,12 +10,21 @@ import os
 /// It only sets attributes: the characters, the undo stack and the draft never see it. A hidden
 /// marker gets a near-zero font and a clear colour, which needs no layout-manager code and works
 /// the same on TextKit 1 and 2 (the spike found no visible gap, and caret and line heights unchanged).
+///
+/// `- ` bullets and `- [ ]` tasks (ADR-017) are indented by level with a hanging indent. Their
+/// indentation is always hidden. On the lines the selection touches, the marker shows raw and dim,
+/// hanging in the gutter; elsewhere it's hidden too and `EditorTextView` draws a bullet or box.
+/// Item paragraphs have no tab stops and a 0.001 pt tab interval, so hidden tabs take no space (the
+/// T18 spike: default stops push the text up to 80 pt; this lines up within 0.04 pt on TextKit 1
+/// and 2; an interval of 0 breaks TextKit 2's layout). A tab inside an item's text takes none either.
 @MainActor
 final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// The editor's font. Bold and italic are its faces; changing it restyles everything.
     var font: NSFont {
         didSet {
             fonts.removeAll()
+            markerWidths.removeAll()
+            paragraphStyles.removeAll()
             restyleAll()
         }
     }
@@ -40,6 +49,12 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// Set while restyling outside an edit, whose attribute-only `processEditing` it ignores.
     private var isApplying = false
     private var fonts: [Traits: NSFont] = [:]
+    /// The list items of the text as last parsed.
+    private var items: [MarkdownListItem] = []
+    /// The editor's selection: items on the lines it touches show their raw marker.
+    private var itemSelection = NSRange(location: 0, length: 0)
+    private var markerWidths: [String: CGFloat] = [:]
+    private var paragraphStyles: [ListStyle: NSParagraphStyle] = [:]
 
     init(font: NSFont) {
         self.font = font
@@ -57,6 +72,70 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             spans = MarkdownStyling.spans(in: textStorage.string)
         }
         return spans
+    }
+
+    /// The text's list items, parsed again if edits were skipped.
+    func currentItems() -> [MarkdownListItem] {
+        if isStale, let textStorage {
+            items = MarkdownLists.items(in: textStorage.string)
+        }
+        return items
+    }
+
+    /// Whether `item` shows its raw marker: the selection touches its line.
+    func isRevealed(_ item: MarkdownListItem) -> Bool {
+        item.isOnLine(touchedBy: itemSelection)
+    }
+
+    /// Where an item's text starts, from the text container's edge: one step per level, plus the
+    /// gutter, which fits `- [x] ` and `- [X] `. Step and gutter are about 1.5 em.
+    func textStart(level: Int) -> CGFloat {
+        let em = font.pointSize
+        let gutter = max(width(of: "- [x] "), width(of: "- [X] "), 1.5 * em)
+        return CGFloat(level) * 1.5 * em + gutter
+    }
+
+    /// `string`'s width in the editor's font, tabs taking no space as in an item.
+    func width(of string: String) -> CGFloat {
+        if let cached = markerWidths[string] {
+            return cached
+        }
+        let attributed = NSAttributedString(string: string, attributes: [.font: font, .paragraphStyle: Self.tablessParagraph])
+        let width = CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(attributed), nil, nil, nil))
+        markerWidths[string] = width
+        return width
+    }
+
+    /// Moves the list reveal to the lines `selection` touches, re-attributing only the items whose
+    /// lines start or stop showing their marker. Not an edit: no undo step, no re-wrap. Returns
+    /// whether any line changed, so the editor redraws its bullets and boxes.
+    @discardableResult
+    func revealItems(on selection: NSRange) -> Bool {
+        let old = itemSelection
+        itemSelection = selection
+        guard let textStorage, !isComposing, !isStale, old != selection, !items.isEmpty else {
+            return false
+        }
+        let changed = items.filter { $0.isOnLine(touchedBy: old) != $0.isOnLine(touchedBy: selection) }
+        guard !changed.isEmpty else {
+            return false
+        }
+        os_signpost(.begin, log: Signpost.log, name: Signpost.restyle)
+        let ns = textStorage.string as NSString
+        isApplying = true
+        textStorage.beginEditing()
+        for item in changed where NSMaxRange(item.lineRange) <= ns.length {
+            let line = ns.lineRange(for: NSRange(location: item.lineRange.location, length: 0))
+            let lineSpans = spans(startingIn: line)
+            let lineRuns = MarkdownStyling.hiddenRuns(of: Array(lineSpans), revealing: revealSelection)
+            let style = lineStyle(for: line, spans: lineSpans, hiddenRuns: lineRuns, item: item, in: ns)
+            apply(style, to: line, in: textStorage)
+            appliedLines[line.location] = style
+        }
+        textStorage.endEditing()
+        isApplying = false
+        os_signpost(.end, log: Signpost.log, name: Signpost.restyle)
+        return true
     }
 
     /// Restyles the whole text: after a draft is restored, the font changes or composition ends.
@@ -93,7 +172,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             let line = ns.lineRange(for: NSRange(location: link.range.location, length: 0))
             let lineSpans = spans.filter { NSLocationInRange($0.range.location, line) }
             let lineRuns = hiddenRuns.filter { NSLocationInRange($0.location, line) }
-            let style = lineStyle(for: line, spans: lineSpans, hiddenRuns: lineRuns, in: ns)
+            let style = lineStyle(for: line, spans: lineSpans, hiddenRuns: lineRuns, item: item(startingAt: line.location), in: ns)
             apply(style, to: line, in: textStorage)
             appliedLines[line.location] = style
         }
@@ -121,6 +200,10 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             if let selection = revealSelection, selection.location >= NSMaxRange(editedRange) - delta {
                 revealSelection = NSRange(location: selection.location + delta, length: selection.length)
             }
+            // Until the editor sets the selection after this edit.
+            if itemSelection.location >= NSMaxRange(editedRange) - delta {
+                itemSelection.location += delta
+            }
             restyle(textStorage, editedRange: editedRange, changeInLength: delta, everything: isStale)
             os_signpost(.end, log: Signpost.log, name: Signpost.restyle)
         }
@@ -137,16 +220,20 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     private func restyle(_ textStorage: NSTextStorage, editedRange: NSRange, changeInLength delta: Int, everything: Bool) {
         let ns = textStorage.string as NSString
         spans = MarkdownStyling.spans(in: ns as String)
+        items = MarkdownLists.items(in: ns as String)
         isStale = false
         if let selection = revealSelection, MarkdownStyling.link(in: spans, withDestinationHolding: selection) == nil {
             revealSelection = nil
         }
+        let selectionStart = min(itemSelection.location, ns.length)
+        itemSelection = NSRange(location: selectionStart, length: min(itemSelection.length, ns.length - selectionStart))
         let hiddenRuns = MarkdownStyling.hiddenRuns(of: spans, revealing: revealSelection)
         let editedEnd = NSMaxRange(editedRange)
 
         var lines: [Int: LineStyle] = [:]
         var spanIndex = 0
         var runIndex = 0
+        var itemIndex = 0
         var start = 0
         repeat {
             let line = ns.lineRange(for: NSRange(location: start, length: 0))
@@ -159,7 +246,11 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             while runIndex < hiddenRuns.count, hiddenRuns[runIndex].location < NSMaxRange(line) {
                 runIndex += 1
             }
-            let style = lineStyle(for: line, spans: spans[spanStart..<spanIndex], hiddenRuns: hiddenRuns[runStart..<runIndex], in: ns)
+            while itemIndex < items.count, items[itemIndex].lineRange.location < line.location {
+                itemIndex += 1
+            }
+            let item = itemIndex < items.count && items[itemIndex].lineRange.location == line.location ? items[itemIndex] : nil
+            let style = lineStyle(for: line, spans: spans[spanStart..<spanIndex], hiddenRuns: hiddenRuns[runStart..<runIndex], item: item, in: ns)
             lines[line.location] = style
 
             let isEdited = line.location <= editedEnd && editedRange.location <= NSMaxRange(line)
@@ -177,10 +268,16 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         appliedLines = lines
     }
 
-    /// One line's attribute runs, relative to its start.
-    private func lineStyle(for line: NSRange, spans: some Collection<MarkdownSpan>, hiddenRuns: some Collection<NSRange>, in ns: NSString) -> LineStyle {
-        guard !spans.isEmpty else {
-            return LineStyle(runs: [], toolTips: [])
+    /// One line's attribute runs, relative to its start, and its list layout if it's an item.
+    private func lineStyle(
+        for line: NSRange,
+        spans: some Collection<MarkdownSpan>,
+        hiddenRuns: some Collection<NSRange>,
+        item: MarkdownListItem?,
+        in ns: NSString
+    ) -> LineStyle {
+        guard !spans.isEmpty || item != nil else {
+            return LineStyle(runs: [], toolTips: [], list: nil)
         }
         var traits = [Traits](repeating: [], count: line.length)
         func mark(_ range: NSRange, _ trait: Traits) {
@@ -215,6 +312,19 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         for run in hiddenRuns {
             mark(run, .hidden)
         }
+        var list: ListStyle?
+        if let item {
+            // Indentation is always hidden; the marker only where the selection isn't.
+            let revealed = isRevealed(item)
+            mark(revealed ? item.indentRange : item.prefixRange, .hidden)
+            if revealed {
+                mark(item.markerRange, .marker)
+            }
+            if item.isChecked {
+                mark(item.contentRange, .checked)
+            }
+            list = ListStyle(level: item.level, revealedMarker: revealed ? ns.substring(with: item.markerRange) : nil)
+        }
 
         var runs: [LineStyle.Run] = []
         var index = 0
@@ -229,7 +339,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             }
             index = end
         }
-        return LineStyle(runs: runs, toolTips: toolTips)
+        return LineStyle(runs: runs, toolTips: toolTips, list: list)
     }
 
     private func apply(_ style: LineStyle, to line: NSRange, in textStorage: NSTextStorage) {
@@ -243,6 +353,58 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             let range = NSRange(location: line.location + toolTip.range.location, length: toolTip.range.length)
             textStorage.addAttribute(.toolTip, value: toolTip.text, range: range)
         }
+        if let list = style.list {
+            textStorage.addAttribute(.paragraphStyle, value: paragraphStyle(for: list), range: line)
+        }
+    }
+
+    /// An item's paragraph: wrapped lines hang at its text start, which doesn't move when the line
+    /// is revealed; a revealed marker starts that much to the left, in the gutter.
+    private func paragraphStyle(for list: ListStyle) -> NSParagraphStyle {
+        if let cached = paragraphStyles[list] {
+            return cached
+        }
+        let style = Self.tablessParagraph.mutableCopy() as! NSMutableParagraphStyle
+        let textStart = textStart(level: list.level)
+        style.headIndent = textStart
+        let markerWidth = list.revealedMarker.map { width(of: $0) } ?? 0
+        style.firstLineHeadIndent = max(textStart - markerWidth, 0)
+        paragraphStyles[list] = style
+        return style
+    }
+
+    /// The spans that start in `line`, found by binary search (`spans` is sorted by start).
+    private func spans(startingIn line: NSRange) -> ArraySlice<MarkdownSpan> {
+        var low = 0
+        var high = spans.count
+        while low < high {
+            let middle = (low + high) / 2
+            if spans[middle].range.location < line.location {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        var end = low
+        while end < spans.count, spans[end].range.location < NSMaxRange(line) {
+            end += 1
+        }
+        return spans[low..<end]
+    }
+
+    /// The item whose line starts at `location`.
+    private func item(startingAt location: Int) -> MarkdownListItem? {
+        var low = 0
+        var high = items.count
+        while low < high {
+            let middle = (low + high) / 2
+            if items[middle].lineRange.location < location {
+                low = middle + 1
+            } else {
+                high = middle
+            }
+        }
+        return low < items.count && items[low].lineRange.location == location ? items[low] : nil
     }
 
     private func attributes(for traits: Traits) -> [NSAttributedString.Key: Any] {
@@ -263,6 +425,13 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         }
         if traits.contains(.url) {
             attributes[.foregroundColor] = NSColor.secondaryLabelColor
+        }
+        if traits.contains(.marker) {
+            attributes[.foregroundColor] = NSColor.tertiaryLabelColor
+        }
+        if traits.contains(.checked) {
+            attributes[.foregroundColor] = NSColor.secondaryLabelColor
+            attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
         }
         return attributes
     }
@@ -287,8 +456,17 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
     private static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
+    /// No tab stops and a 0.001 pt interval: a tab takes (almost) no space, so hidden indentation
+    /// doesn't push an item's text or its revealed marker (T18 spike).
+    private static let tablessParagraph: NSParagraphStyle = {
+        let style = NSMutableParagraphStyle()
+        style.tabStops = []
+        style.defaultTabInterval = 0.001
+        return style
+    }()
+
     private struct Traits: OptionSet, Hashable {
-        let rawValue: UInt8
+        let rawValue: UInt16
 
         static let bold = Traits(rawValue: 1 << 0)
         static let italic = Traits(rawValue: 1 << 1)
@@ -298,6 +476,16 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         /// A revealed link's URL.
         static let url = Traits(rawValue: 1 << 5)
         static let hidden = Traits(rawValue: 1 << 6)
+        /// A list marker shown raw, on a line the selection touches.
+        static let marker = Traits(rawValue: 1 << 7)
+        /// A checked task's text.
+        static let checked = Traits(rawValue: 1 << 8)
+    }
+
+    /// An item line's layout: its level, and its raw marker if the line is revealed.
+    private struct ListStyle: Hashable {
+        let level: Int
+        let revealedMarker: String?
     }
 
     /// One line's styling, relative to the line's start, compared to skip unchanged lines.
@@ -314,5 +502,6 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
         let runs: [Run]
         let toolTips: [ToolTip]
+        let list: ListStyle?
     }
 }

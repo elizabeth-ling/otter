@@ -219,6 +219,32 @@ func imagesWikilinksAndBareURLsAreNotStyled(text: String) {
     #expect(hidden(text, revealing: NSRange(location: 13, length: 0)) == ["[**", "**](url)"])
 }
 
+@Test func aListPrefixRunIsNeverMergedWithAnInlineMarker() {
+    let text = "- **a**\n\t- [ ] ~~b~~"
+    let ns = text as NSString
+    let runs = MarkdownStyling.hiddenRuns(of: MarkdownStyling.spans(in: text), items: MarkdownLists.items(in: text), selection: nil)
+    #expect(runs.map(ns.substring(with:)) == ["- ", "**", "**", "\t- [ ] ", "~~", "~~"])
+}
+
+@Test func aRevealedItemContributesOnlyItsIndentation() {
+    let text = "- **a**\n\t- [ ] ~~b~~"
+    let ns = text as NSString
+    let spans = MarkdownStyling.spans(in: text)
+    let items = MarkdownLists.items(in: text)
+    // The caret on line 2: only its tab is hidden; line 1 still hides its prefix.
+    let caretOnLine2 = MarkdownStyling.hiddenRuns(of: spans, items: items, selection: NSRange(location: 16, length: 0))
+    #expect(caretOnLine2.map(ns.substring(with:)) == ["- ", "**", "**", "\t", "~~", "~~"])
+    // On line 1, which has no indentation, nothing of the prefix is hidden.
+    let caretOnLine1 = MarkdownStyling.hiddenRuns(of: spans, items: items, selection: NSRange(location: 4, length: 0))
+    #expect(caretOnLine1.map(ns.substring(with:)) == ["**", "**", "\t- [ ] ", "~~", "~~"])
+}
+
+@Test func listItemsAndInlineStylesAgreeOnFences() {
+    let text = "```\n- **a**\n```\n- **b**"
+    #expect(styles(text) == ["bold b"])
+    #expect(MarkdownLists.items(in: text).map(\.contentRange.location) == [18])
+}
+
 // MARK: - UTF-16
 
 @Test func rangesCountUTF16AfterEmoji() {

@@ -35,7 +35,7 @@ These are the tie-breakers for every decision.
 
 - Menu-bar agent app (no Dock icon), launches at login.
 - Global hotkey **`⌥Space`** (fully configurable; onboarding offers `⌘Space` and walks you through moving Spotlight off it) toggles a small floating sticky-note panel above any app, Space or full-screen window. It can be dragged anywhere and reopens where you left it.
-- Plain-text Markdown editor that shows inline styles (bold, italic, strikethrough, code, links) as you type, with draft autosave; `⌘↩` to save and close; `⌘S` to save under a name (defaults to the date and time) and start a new note; `Esc` to close and keep the draft.
+- Plain-text Markdown editor that shows inline styles (bold, italic, strikethrough, code, links), `- ` bullets and `- [ ]` checkboxes as you type, with draft autosave; `⌘↩` to save and close; `⌘S` to save under a name (defaults to the date and time) and start a new note; `Esc` to close and keep the draft.
 - Destinations:
   - **Folder** — new file per note, or append to a single inbox file.
   - **Obsidian** — vault auto-discovery; append to today's daily note (default), append to an inbox note, or new note in a folder. Respects the vault's daily-note and attachment settings.
@@ -49,7 +49,7 @@ These are the tie-breakers for every decision.
 
 - Viewing, searching or editing existing notes (beyond the current draft).
 - Its own storage format, database, or sync.
-- Rich-text storage or a full WYSIWYG editor. The note is always plain Markdown; the editor only styles inline Markdown for display and hides the markers on screen (ADR-016). Headings, lists and previews aren't rendered.
+- Rich-text storage or a full WYSIWYG editor. The note is always plain Markdown; the editor only styles inline Markdown for display and hides the markers on screen (ADR-016). `- ` bullets and `- [ ]` tasks show as bullets and checkboxes (ADR-017); headings, other lists and previews aren't rendered.
 - iOS / iPadOS / Windows.
 - AI features, tagging suggestions, link previews that fetch from the network.
 - Capturing the current selection from other apps (needs Accessibility permission; revisit post-v1).
@@ -88,7 +88,7 @@ The key insight: **an Obsidian vault is just a folder of Markdown files.** Obsid
 | Milestone | Outcome | Tasks | Rough effort (solo + coding agent) |
 |---|---|---|---|
 | **M0 — Walking skeleton** | Usable daily: hotkey → panel → saves to a folder you pick | T01–T06 | 4–6 days |
-| **M1 — Integrations** | Obsidian vault awareness, paste images, clipboard hotkey, save-as, change folder from the panel | T07, T09, T11, T16, T17 | 4–6 days |
+| **M1 — Integrations** | Obsidian vault awareness, paste images, clipboard hotkey, save-as, change folder from the panel, lists and checkboxes in the editor | T07, T09, T11, T16, T17, T18 | 4–6 days |
 | **M2 — Ship it** | Onboarding, settings, menu bar polish, notarized DMG with auto-update | T10, T12, T13, T14 | 4–6 days |
 | **M3 — After v1** | Apple Notes destination | T08 | 2–4 days |
 

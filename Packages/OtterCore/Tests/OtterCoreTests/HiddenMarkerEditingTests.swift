@@ -452,3 +452,240 @@ private func shownText(of text: String, in range: NSRange, rules: HiddenMarkerEd
     #expect(replaced("🎉 ⟨**é**⟩", with: "👍") == "🎉 **👍‸**")
     #expect(stopsForward("🎉**👩‍👩‍👧**") == [0, 2, 12])
 }
+
+// MARK: - Lists (ADR-017)
+
+/// The list rules, with the editor's selection at `selection`: items on its lines show their marker.
+private func listEditing(_ text: String, selection: NSRange?) -> HiddenMarkerEditing {
+    HiddenMarkerEditing(text: text, items: MarkdownLists.items(in: text), selection: selection)
+}
+
+/// The list rules for `marked`, with the editor's selection where it's marked.
+private func listEditing(_ marked: String) -> (rules: HiddenMarkerEditing, text: String, selection: NSRange) {
+    let (text, selection) = unmark(marked)
+    return (listEditing(text, selection: selection), text, selection)
+}
+
+private func listBroken(_ marked: String) -> String? {
+    let (rules, text, selection) = listEditing(marked)
+    return applied(rules.lineBreak(at: selection), to: text)
+}
+
+private func listDeleted(_ marked: String, backward: Bool = true) -> String? {
+    let (rules, text, selection) = listEditing(marked)
+    let edit = selection.length > 0 ? rules.deletion(of: selection) : rules.deletion(backward: backward, from: selection.location)
+    return applied(edit, to: text)
+}
+
+private func listCopied(_ marked: String) -> String {
+    let (rules, _, selection) = listEditing(marked)
+    return rules.copiedMarkdown(for: selection)
+}
+
+// MARK: Caret
+
+@Test func arrivingOnAnItemFromAnotherLineSnapsToItsText() {
+    // "x⏎\t- [ ] jam": the prefix is 2..<9, the text starts at 9. The selection is on line 1.
+    let rules = listEditing("x\n\t- [ ] jam", selection: NSRange(location: 0, length: 0))
+    for position in 2...9 {
+        #expect(rules.caretStop(position) == 9, "position \(position)")
+    }
+    #expect(rules.caretStop(10) == 10)
+    #expect(rules.caretStop(1) == 1)
+}
+
+@Test func onTheItemsOwnLineOnlyItsIndentationIsHidden() {
+    let text = "x\n\t- [ ] jam"
+    let rules = listEditing(text, selection: NSRange(location: 10, length: 0))
+    #expect(rules.hiddenRuns == [NSRange(location: 2, length: 1)])
+    // Before the `-`, and inside `[ ]`.
+    #expect(rules.caretStop(3) == 3)
+    #expect(rules.caretStop(5) == 5)
+    #expect(rules.caretStop(6) == 6)
+    #expect(rules.caretStop(7) == 7)
+}
+
+@Test func aPositionInARevealedLinesIndentationSnapsToJustBeforeTheDash() {
+    // "x⏎\t\t- a": indentation 2..<4, `-` at 4.
+    let rules = listEditing("x\n\t\t- a", selection: NSRange(location: 6, length: 0))
+    #expect(rules.caretStop(2) == 4)
+    #expect(rules.caretStop(3) == 4)
+    #expect(rules.caretStop(4) == 4)
+}
+
+@Test func leftStepsThroughARevealedMarkerThenToTheLineAbove() {
+    // "ab⏎\t- [ ] c": `-` at 4, text at 10.
+    let text = "ab\n\t- [ ] c"
+    let revealed = listEditing(text, selection: NSRange(location: 10, length: 0))
+    var stops = [10]
+    while true {
+        let previous = revealed.previousCaretStop(before: stops.last!)
+        guard previous != stops.last else {
+            break
+        }
+        stops.append(previous)
+    }
+    #expect(stops == [10, 9, 8, 7, 6, 5, 4, 2, 1, 0])
+    // `→` from the end of the line above, where the item's marker is still hidden.
+    let above = listEditing(text, selection: NSRange(location: 2, length: 0))
+    #expect(above.nextCaretStop(after: 2) == 10)
+}
+
+@Test func aPrefixRunAndAnInlineRunAreNeverMerged() {
+    #expect(listEditing("- **b**", selection: nil).hiddenRuns == [
+        NSRange(location: 0, length: 2), NSRange(location: 2, length: 2), NSRange(location: 5, length: 2),
+    ])
+    // Revealed: stops before `-`, before the space, and at 2 (before the hidden `**`); 4 snaps back to 2.
+    let revealed = listEditing("- **b**", selection: NSRange(location: 5, length: 0))
+    #expect((0...4).map(revealed.caretStop) == [0, 1, 2, 2, 2])
+    #expect(revealed.nextCaretStop(after: 0) == 1)
+    #expect(revealed.nextCaretStop(after: 1) == 2)
+    #expect(revealed.nextCaretStop(after: 2) == 5)
+    // Arriving from line 1: anywhere in the item's 0…4 lands at its 2.
+    let arriving = listEditing("x\n- **b**", selection: NSRange(location: 0, length: 0))
+    #expect((2...6).map(arriving.caretStop) == [4, 4, 4, 4, 4])
+}
+
+// MARK: Selections
+
+@Test func aSelectionIncludingTheDashTakesTheIndentation() {
+    // "a⏎\t\t- b": indentation 2..<4.
+    let text = "a\n\t\t- b"
+    let rules = listEditing(text, selection: NSRange(location: 6, length: 0))
+    #expect(rules.trimmedSelection(NSRange(location: 4, length: 3)) == NSRange(location: 2, length: 5))
+    #expect(rules.trimmedSelection(NSRange(location: 3, length: 4)) == NSRange(location: 2, length: 5))
+    // An end inside hidden indentation goes back before it.
+    #expect(rules.trimmedSelection(NSRange(location: 0, length: 3)) == NSRange(location: 0, length: 2))
+    // Text only: no marker, no indentation.
+    #expect(rules.trimmedSelection(NSRange(location: 6, length: 1)) == NSRange(location: 6, length: 1))
+}
+
+@Test func aHiddenPrefixGoesWholeWithASelection() {
+    // From another line, a selection from the line's start keeps all of the hidden prefix.
+    let rules = listEditing("- a\n- b", selection: NSRange(location: 6, length: 0))
+    #expect(rules.trimmedSelection(NSRange(location: 0, length: 7)) == NSRange(location: 0, length: 7))
+    #expect(rules.trimmedSelection(NSRange(location: 1, length: 6)) == NSRange(location: 0, length: 7))
+}
+
+@Test func selectAllThenDeleteEmptiesTheNote() {
+    let text = "- [ ] a\n\t- b\n- **c**"
+    let all = NSRange(location: 0, length: (text as NSString).length)
+    #expect(applied(listEditing(text, selection: all).deletion(of: all), to: text) == "‸")
+}
+
+// MARK: ↩
+
+@Test(arguments: [
+    ("- ab‸c", "- ab\n- ‸c"),
+    ("\t- ab‸c", "\t- ab\n\t- ‸c"),
+    ("  - abc‸", "  - abc\n  - ‸"),
+    ("- [ ] ab‸", "- [ ] ab\n- [ ] ‸"),
+    // A new task is always unchecked.
+    ("\t- [x] ab‸c", "\t- [x] ab\n\t- [ ] ‸c"),
+    ("-\tab‸", "-\tab\n- ‸"),
+])
+func returnContinuesTheList(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test(arguments: [
+    ("- **ab‸c**", "- **ab**\n- ‸**c**"),
+    ("- [ ] *a‸b*", "- [ ] *a*\n- [ ] ‸*b*"),
+    ("- **abc‸**", "- **abc**\n- ‸"),
+])
+func returnSplitsInlineSpansInAnItem(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test(arguments: [
+    // At the start of the text: an empty item goes above, and the text moves down with the caret.
+    ("- ‸abc", "- \n- ‸abc"),
+    ("\t- [ ] ‸abc", "\t- [ ] \n\t- [ ] ‸abc"),
+    // Before or inside the revealed marker: the same.
+    ("‸- abc", "- \n- ‸abc"),
+    ("-‸ abc", "- \n- ‸abc"),
+    ("- [‸ ] abc", "- [ ] \n- [ ] ‸abc"),
+    // The item keeps its check; the empty one above is unchecked.
+    ("- [x‸] done", "- [ ] \n- [x] ‸done"),
+])
+func returnAtTheStartLeavesAnEmptyItemAbove(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test(arguments: [
+    ("- a\n\t- ‸", "- a\n- ‸"),
+    ("- a\n\t- [ ] ‸", "- a\n- [ ] ‸"),
+    ("- a\n  - b\n      -   ‸", "- a\n  - b\n  -   ‸"),
+    ("- a\n- ‸", "- a\n‸"),
+    ("- a\n-   ‸", "- a\n‸"),
+    ("- [ ] ‸", "‸"),
+    ("- a\n- ‸\n- c", "- a\n‸\n- c"),
+])
+func returnOnAnEmptyItemOutdentsOrEndsTheList(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test func returnOutsideItemsIsAsBefore() {
+    #expect(listBroken("```\n- a‸\n```") == "```\n- a\n‸\n```")
+    #expect(listBroken("a‸b") == "a\n‸b")
+    #expect(listBroken("**ab‸c**") == "**ab**\n‸**c**")
+    #expect(listBroken("- a\n> - b‸") == "- a\n> - b\n‸")
+}
+
+@Test func pastedLineBreaksNeverAddMarkers() {
+    let (rules, text, selection) = listEditing("- ab‸c")
+    #expect(applied(rules.replacement(of: selection, with: "x\ny"), to: text) == "- abx\ny‸c")
+}
+
+// MARK: ⌫, ⌦ and copy
+
+@Test(arguments: [
+    ("- ‸a", "‸a"),
+    ("\t- [ ] ‸jam", "\t‸jam"),
+    ("  - [x] ‸", "  ‸"),
+    ("- ‸**b**", "‸**b**"),
+    ("- ‸", "‸"),
+])
+func backspaceAtTheStartOfTheTextRemovesTheMarker(input: String, expected: String) {
+    #expect(listDeleted(input) == expected)
+}
+
+@Test func backspaceInARevealedMarkerIsPlain() {
+    #expect(listDeleted("- [ ]‸ a") == "- [ ‸ a")
+    #expect(listDeleted("-‸ a") == "‸ a")
+}
+
+@Test func backspaceJustAfterHiddenIndentationDeletesTheLineBreakWithIt() {
+    #expect(listDeleted("a\n\t\t‸- b") == "a‸- b")
+    #expect(listDeleted("\t‸- b") == nil)
+}
+
+@Test(arguments: [
+    ("- a‸\n- b", "- a‸b"),
+    ("- [ ] a‸\n\t- [x] b", "- [ ] a‸b"),
+    ("- **a‸**\n- b", "- **a‸**b"),
+    ("- ‸\n- b", "- ‸b"),
+    // The next line isn't an item: only the line break goes.
+    ("- a‸\nb", "- a‸b"),
+])
+func forwardDeleteAtTheEndJoinsTheNextItem(input: String, expected: String) {
+    #expect(listDeleted(input, backward: false) == expected)
+}
+
+@Test func deletingASelectionAcrossItemsRemovesThePrefixesInIt() {
+    #expect(listDeleted("- a⟨b\n- c⟩d") == "- a‸d")
+    #expect(listDeleted("- a⟨b\n\t- [ ] c\n- d⟩e") == "- a‸e")
+}
+
+@Test func copiedMarkdownKeepsMarkersAcrossLines() {
+    #expect(listCopied("⟨- a\n\t- [ ] b⟩") == "- a\n\t- [ ] b")
+    #expect(listCopied("- a⟨b\n- c⟩d") == "b\n- c")
+}
+
+@Test func copyingWithinOneItemIncludesItsMarkerOnlyIfSelected() {
+    #expect(listCopied("- a⟨bc⟩") == "bc")
+    #expect(listCopied("⟨- abc⟩") == "- abc")
+    // From the `-`, the indentation comes too.
+    #expect(listCopied("\t⟨- abc⟩") == "\t- abc")
+    #expect(listCopied("- **a⟨b⟩c**") == "**b**")
+}

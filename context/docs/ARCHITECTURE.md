@@ -42,8 +42,8 @@ Otter/
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)
 │   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
-│   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling; caret, delete and copy around hidden markers (ADR-016)
-│   ├── Panel/MarkdownStyler.swift   # text storage delegate: MarkdownStyling spans → display-only style and hiding attributes (ADR-016)
+│   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling; caret, delete and copy around hidden markers (ADR-016); draws bullets and checkboxes, list keys (T18)
+│   ├── Panel/MarkdownStyler.swift   # text storage delegate: MarkdownStyling spans and list items → display-only style, indent and hiding attributes (ADR-016, ADR-017)
 │   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
 │   ├── Panel/AttachmentChips.swift   # chips row above the footer: thumbnail or icon, name, size, ✕ (T09)
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
@@ -69,7 +69,8 @@ Otter/
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift   # after v1 (T08)
     │   ├── Editor/MarkdownFormatting.swift   # ⌘B/⌘I/⇧⌘X/⌘E/⌘K: Markdown markers to add or remove, as one edit
     │   │          MarkdownStyling.swift      # inline Markdown → spans: kind, content and marker ranges (UTF-16) (ADR-016)
-    │   │          HiddenMarkerEditing.swift  # caret stops, deletions, typing over a selection, line-break splits, copied Markdown (ADR-016)
+    │   │          HiddenMarkerEditing.swift  # caret stops, deletions, typing over a selection, line-break splits, copied Markdown (ADR-016); list prefixes, ↩ continues lists (T18)
+    │   │          MarkdownLists.swift        # `- ` / `- [ ]` items: prefix, level, checked; ⌘L, ⇧⌘8, Tab/⇧Tab, checkbox toggle edits (T18, ADR-017)
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
     │   ├── Clipboard/ClipboardSave.swift, HUDPlacement.swift   # what the clipboard holds, HUD messages, "Already saved" window, HUD frame (T11)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
@@ -276,7 +277,7 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 ## 11. Testing strategy
 
-- **OtterCore unit tests** (fast, run in CI): Markdown formatting, inline styling and hidden-marker editing rules, file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
+- **OtterCore unit tests** (fast, run in CI): Markdown formatting, inline styling, list items and hidden-marker editing rules, file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
 - **Integration tests** (local only): Folder/Obsidian destinations against temp directories; Apple Notes (T08, after v1) behind an env flag because it needs TCC.
 - **Manual test matrix** (T14): Spaces, full-screen apps, Stage Manager, multiple displays, IME input, Dark/Light, accessibility settings, iCloud Drive vaults.
 
