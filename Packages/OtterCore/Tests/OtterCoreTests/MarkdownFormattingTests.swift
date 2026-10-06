@@ -262,3 +262,54 @@ func nonASCIITextKeepsItsRanges(style: MarkdownStyle, input: String, expected: S
 @Test func aSelectionOutsideTheTextIsIgnored() {
     #expect(MarkdownFormatting.apply(.bold, to: "abc", selection: NSRange(location: 2, length: 5)) == nil)
 }
+
+// MARK: - Hidden markers (ADR-016)
+
+@Test(arguments: [
+    // At a span's end the shortcut steps out of it: no change, caret after the closing marker.
+    (MarkdownStyle.bold, "say **bold‸** there", "say **bold**‸ there"),
+    (.italic, "*it‸*", "*it*‸"),
+    (.strikethrough, "~~gone‸~~", "~~gone~~‸"),
+    (.code, "``co`de‸``", "``co`de``‸"),
+    (.bold, "**two words‸**", "**two words**‸"),
+    // Only out of the span of that style.
+    (.bold, "***x‸***", "***x**‸*"),
+    (.italic, "***x‸***", "***x***‸"),
+    // Pressed again there, it stays out.
+    (.bold, "**bold**‸", "**bold**‸"),
+])
+func theShortcutAtASpansEndMovesTheCaretOut(style: MarkdownStyle, input: String, expected: String) {
+    #expect(format(style, input) == expected)
+}
+
+@Test func steppingOutChangesNoText() throws {
+    let edit = try #require(MarkdownFormatting.apply(.bold, to: "**bold**", selection: NSRange(location: 6, length: 0)))
+    #expect(edit == MarkdownEdit(range: NSRange(location: 6, length: 0), replacement: "", selection: NSRange(location: 8, length: 0)))
+}
+
+@Test(arguments: [
+    // A caret at a hidden run's edge counts as inside the span next to it.
+    (MarkdownStyle.bold, "‸**bold**", "‸bold"),
+    (.italic, "**bold‸**", "***bold‸***"),
+    (.italic, "‸**bold**", "***‸bold***"),
+    (.code, "a ‸~~gone~~", "a ~~`‸gone`~~"),
+    // Inside a span of the style, the whole span comes off, however many words.
+    (.bold, "**t‸wo words**", "t‸wo words"),
+    (.strikethrough, "x ~~a b‸ c~~", "x a b‸ c"),
+    (.code, "``a `b‸` c``", "a `b‸` c"),
+])
+func aCaretAtAHiddenEdgeOrInsideASpanTogglesIt(style: MarkdownStyle, input: String, expected: String) {
+    #expect(format(style, input) == expected)
+}
+
+@Test(arguments: [
+    "[te‸xt](https://a.b)", "[text‸](https://a.b)", "‸[text](https://a.b)", "[text](https://a.b)‸",
+    "[⟨text⟩](https://a.b)", "[**te‸xt**](https://a.b)",
+])
+func linkInAnExistingLinkSelectsItsURL(input: String) {
+    #expect(format(.link, input) == "[\(input.contains("**") ? "**text**" : "text")](⟨https://a.b⟩)")
+}
+
+@Test func linkInAnEmptyLinksURLSelectsTheEmptyURL() {
+    #expect(format(.link, "[a](‸)") == "[a](‸)")
+}

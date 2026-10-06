@@ -1,7 +1,8 @@
 import Foundation
 
-/// A formatting shortcut in the panel's editor (UX_SPEC §2). The editor is plain text, so each one
-/// only adds or removes Markdown markers.
+/// An inline Markdown style: what a formatting shortcut in the panel's editor adds or removes
+/// (UX_SPEC §2), and what `MarkdownStyling` finds for the editor to show (ADR-016). The text stays
+/// plain, so a shortcut only adds or removes Markdown markers.
 public enum MarkdownStyle: Sendable, CaseIterable {
     /// `⌘B`: `**…**`.
     case bold
@@ -43,9 +44,12 @@ public enum MarkdownFormatting {
     /// - A selection across lines is done line by line, skipping blank lines and leaving list,
     ///   quote and heading prefixes outside the markers. If every line is already wrapped, they're
     ///   all unwrapped; otherwise the lines that aren't are wrapped.
-    /// - With no selection, a caret inside a word toggles that word and stays where it was in it.
-    ///   A caret between an empty pair removes the pair; anywhere else an empty pair is inserted
-    ///   with the caret between.
+    /// - With no selection, a caret at the end of a span of the style moves after its closing
+    ///   marker, with no change to the text, so what's typed next is plain (ADR-016). A caret
+    ///   inside a span of the style removes that span's markers. A caret inside a word toggles that
+    ///   word and stays where it was in it. A caret between an empty pair removes the pair; anywhere
+    ///   else an empty pair is inserted with the caret between. The editor hides complete spans'
+    ///   markers, so a caret at either edge of a hidden run counts as inside the span next to it.
     /// - Bold and italic share `*`, so a run of three is both: `⌘I` on `**x**` gives `***x***`,
     ///   and taking either off `***x***` leaves the other.
     ///
@@ -53,6 +57,8 @@ public enum MarkdownFormatting {
     /// selected. A single http(s) URL on the clipboard is used instead, with the caret after the
     /// link. A selection (or the text at the caret) that is itself a URL becomes the destination,
     /// with the caret in the empty brackets. Otherwise an empty link is inserted, caret in the brackets.
+    /// With the caret or selection in an existing link, nothing changes and its URL is selected,
+    /// which shows the link raw in the editor.
     ///
     /// - Parameter clipboard: The clipboard's plain text; only links read it.
     public static func apply(_ style: MarkdownStyle, to text: String, selection: NSRange, clipboard: String? = nil) -> MarkdownEdit? {
@@ -61,10 +67,10 @@ public enum MarkdownFormatting {
             return nil
         }
         switch style {
-        case .bold: return toggle(.bold, in: text, selection: selection)
-        case .italic: return toggle(.italic, in: text, selection: selection)
-        case .strikethrough: return toggle(.strikethrough, in: text, selection: selection)
-        case .code: return toggle(.code, in: text, selection: selection)
+        case .bold: return toggle(.bold, style, in: text, selection: selection)
+        case .italic: return toggle(.italic, style, in: text, selection: selection)
+        case .strikethrough: return toggle(.strikethrough, style, in: text, selection: selection)
+        case .code: return toggle(.code, style, in: text, selection: selection)
         case .link: return link(in: text, selection: selection, clipboard: clipboard)
         }
     }
@@ -109,10 +115,10 @@ public enum MarkdownFormatting {
         case plain
     }
 
-    private static func toggle(_ wrapper: Wrapper, in text: String, selection: NSRange) -> MarkdownEdit? {
+    private static func toggle(_ wrapper: Wrapper, _ style: MarkdownStyle, in text: String, selection: NSRange) -> MarkdownEdit? {
         let ns = text as NSString
         guard selection.length > 0 else {
-            return toggleAtCaret(wrapper, in: text, caret: selection.location)
+            return toggleAtCaret(wrapper, style, in: text, caret: selection.location)
         }
 
         let segments = lines(of: selection, in: ns).compactMap { line -> NSRange? in
@@ -159,9 +165,25 @@ public enum MarkdownFormatting {
         return MarkdownEdit(range: edit.range, replacement: edit.replacement, selection: newSelection)
     }
 
-    private static func toggleAtCaret(_ wrapper: Wrapper, in text: String, caret: Int) -> MarkdownEdit {
+    private static func toggleAtCaret(_ wrapper: Wrapper, _ style: MarkdownStyle, in text: String, caret original: Int) -> MarkdownEdit {
         let ns = text as NSString
         let width = wrapper.width
+        let spans = MarkdownStyling.spans(in: text)
+        let caret = caretInside(spans, at: original)
+
+        // At the end of a span of this style, with only hidden markers between: step out of it, so
+        // typing is plain.
+        let hidden = HiddenMarkerEditing(text: text, spans: spans)
+        let stop = hidden.caretStop(original)
+        if let span = spans.filter({ $0.kind == style && hidden.caretStop(NSMaxRange($0.contentRange)) == stop })
+            .min(by: { NSMaxRange($0.range) < NSMaxRange($1.range) }) {
+            return MarkdownEdit(range: NSRange(location: original, length: 0), replacement: "", selection: NSRange(location: NSMaxRange(span.range), length: 0))
+        }
+        // Inside one: take it off, the innermost if they nest.
+        if let span = spans.last(where: { $0.kind == style && $0.contentRange.location <= caret && caret < NSMaxRange($0.contentRange) }) {
+            let content = ns.substring(with: span.contentRange)
+            return MarkdownEdit(range: span.range, replacement: content, selection: NSRange(location: caret - span.openingMarker.length, length: 0))
+        }
 
         // Between an empty pair: remove it.
         let before = run(of: wrapper.marker, in: ns, endingAt: caret)
@@ -171,7 +193,7 @@ public enum MarkdownFormatting {
             return MarkdownEdit(range: pair, replacement: "", selection: NSRange(location: caret - width, length: 0))
         }
 
-        if let word = word(at: caret, in: text) {
+        if let word = word(at: caret, in: text, edges: spans) {
             switch state(of: word, wrapper, in: ns) {
             case .outside:
                 let outer = NSRange(location: word.location - width, length: word.length + 2 * width)
@@ -240,11 +262,36 @@ public enum MarkdownFormatting {
         return (NSRange(location: start, length: end - start), replacement)
     }
 
+    /// Where a caret at the edge of a hidden run counts as being: at the content edge of the span
+    /// on the visible side. Before an opening marker it's at the content's start; after a closing
+    /// marker (where the editor leaves it after `⌘B` at a span's end), at the content's end.
+    private static func caretInside(_ spans: [MarkdownSpan], at caret: Int) -> Int {
+        if spans.contains(where: { NSMaxRange($0.contentRange) == caret || $0.contentRange.location == caret }) {
+            return caret
+        }
+        let runs = MarkdownStyling.hiddenRuns(of: spans)
+        if let run = runs.first(where: { $0.location == caret }) {
+            return NSMaxRange(run)
+        }
+        if let run = runs.first(where: { NSMaxRange($0) == caret }) {
+            return run.location
+        }
+        return caret
+    }
+
     // MARK: - Links
 
     private static func link(in text: String, selection: NSRange, clipboard: String?) -> MarkdownEdit? {
         let ns = text as NSString
         let clipboardURL = clipboard.flatMap(webURL(in:))
+
+        // In an existing link, at either edge included: select its URL to show it and type over it.
+        let existing = MarkdownStyling.spans(in: text).last { span in
+            span.kind == .link && span.range.location <= selection.location && NSMaxRange(selection) <= NSMaxRange(span.range)
+        }
+        if let destination = existing?.destinationRange {
+            return MarkdownEdit(range: NSRange(location: selection.location, length: 0), replacement: "", selection: destination)
+        }
 
         let target: NSRange?
         if selection.length > 0 {
@@ -299,14 +346,17 @@ public enum MarkdownFormatting {
     // MARK: - Text helpers
 
     /// The word the caret is inside, with word characters on both sides. A caret at a word's start
-    /// or end isn't inside it. Letters, digits and `_` make words, plus an apostrophe between letters.
-    private static func word(at caret: Int, in text: String) -> NSRange? {
+    /// or end isn't inside it, unless that's also the edge of a span's content in `edges`, where
+    /// the markers are hidden. Letters, digits and `_` make words, plus an apostrophe between letters.
+    private static func word(at caret: Int, in text: String, edges spans: [MarkdownSpan] = []) -> NSRange? {
         guard let index = Range(NSRange(location: caret, length: 0), in: text)?.lowerBound else {
             return nil
         }
         let left = wordLength(text[..<index].reversed())
         let right = wordLength(text[index...])
-        guard left > 0, right > 0 else {
+        let atContentEnd = left > 0 && spans.contains { NSMaxRange($0.contentRange) == caret }
+        let atContentStart = right > 0 && spans.contains { $0.contentRange.location == caret }
+        guard (left > 0 && right > 0) || atContentEnd || atContentStart else {
             return nil
         }
         return NSRange(location: caret - left, length: left + right)
