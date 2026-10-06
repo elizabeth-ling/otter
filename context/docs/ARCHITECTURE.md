@@ -42,7 +42,8 @@ Otter/
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)
 │   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
-│   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling
+│   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling; caret, delete and copy around hidden markers (ADR-016)
+│   ├── Panel/MarkdownStyler.swift   # text storage delegate: MarkdownStyling spans → display-only style and hiding attributes (ADR-016)
 │   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
 │   ├── Panel/AttachmentChips.swift   # chips row above the footer: thumbnail or icon, name, size, ✕ (T09)
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
@@ -66,6 +67,8 @@ Otter/
     │   │                         ObsidianAttachmentPlacement.swift, ObsidianLink.swift, VaultDiscovery.swift
     │   ├── Destinations/AppleNotes/AppleNotesDestination.swift, NotesHTML.swift, OsascriptRunner.swift   # after v1 (T08)
     │   ├── Editor/MarkdownFormatting.swift   # ⌘B/⌘I/⇧⌘X/⌘E/⌘K: Markdown markers to add or remove, as one edit
+    │   │          MarkdownStyling.swift      # inline Markdown → spans: kind, content and marker ranges (UTF-16) (ADR-016)
+    │   │          HiddenMarkerEditing.swift  # caret stops, deletions, typing over a selection, line-break splits, copied Markdown (ADR-016)
     │   ├── Panel/PanelPlacement.swift, PanelFrameStore.swift   # pure panel size/position maths; remembered size + per-display positions (T03, T15)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
     │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
@@ -257,11 +260,11 @@ Settings in `UserDefaults` (suite `com.<you>.otter`). Nothing is stored anywhere
 |---|---|---|
 | Cold launch → hotkey ready | < 300 ms | No work at launch besides panel creation + hotkey registration; outbox drain deferred 1 s |
 | Hotkey → panel visible + key | < 50 ms target, 100 ms p95 | Pre-built panel, no SwiftUI view rebuild on show, draft read cached in memory |
-| Keystroke latency | Native `NSTextView` | No per-keystroke work besides debounced draft save |
+| Keystroke latency | Native `NSTextView`; inline restyle < 1 ms for a 10 KB note | No per-keystroke work besides debounced draft save and inline styling: the whole note is parsed, only lines whose spans changed are re-attributed (ADR-016) |
 | `⌘↩` → panel hidden | < 50 ms | Outbox write only; formatting happens in delivery |
 | Idle | 0% CPU, < 40 MB | No timers when outbox empty; release attachment thumbnails on hide |
 
-Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, `enqueue→delivered` (per destination). T14 verifies.
+Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, `enqueue→delivered` (per destination), `restyle` (per edit). T14 verifies.
 
 ## 10. Error handling and logging
 
@@ -271,7 +274,7 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 ## 11. Testing strategy
 
-- **OtterCore unit tests** (fast, run in CI): file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
+- **OtterCore unit tests** (fast, run in CI): Markdown formatting, inline styling and hidden-marker editing rules, file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
 - **Integration tests** (local only): Folder/Obsidian destinations against temp directories; Apple Notes (T08, after v1) behind an env flag because it needs TCC.
 - **Manual test matrix** (T14): Spaces, full-screen apps, Stage Manager, multiple displays, IME input, Dark/Light, accessibility settings, iCloud Drive vaults.
 

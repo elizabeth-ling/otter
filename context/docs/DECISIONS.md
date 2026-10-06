@@ -76,7 +76,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 ---
 
-## ADR-007 · Plain-text editor, no Markdown rendering in v1
+## ADR-007 · Plain-text editor, no Markdown rendering in v1 — **Inline styling added by ADR-016**
 
 **Context.** Capture is about speed. Live Markdown rendering adds complexity, keystroke latency risk and edge cases (IME, undo).
 
@@ -175,3 +175,21 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - Keep the seams that cost nothing: `Destination.supportsAttachments`, `DestinationHealth.needsPermission`, `DeliveryReceipt.Location.appleNote`, the factory's per-kind builders and `NSAppleEventsUsageDescription`. ADR-003's approach stands for when T08 is built.
 
 **Consequences.** The primary user (OVERVIEW §4) is someone who lives in Obsidian; Apple Notes users get the Folder destination until M3. Onboarding is simpler: step 2 picks a vault or a folder, with no permission prompt beyond Files & Folders. ADR-004's App Store concern about Apple Events no longer applies to v1, though the Obsidian-config reason for staying unsandboxed still does.
+
+---
+
+## ADR-016 · The editor styles inline Markdown and hides its markers; notes stay plain Markdown (amends ADR-007)
+
+**Context.** The formatting shortcuts (`⌘B`, `⌘I`, `⇧⌘X`, `⌘E`, `⌘K`) put Markdown markers in a plain-text editor, so bolding a word shows `**word**` and nothing looks bold. The product owner wants bold to look bold, struck text struck through, and so on, with the markers out of sight. ADR-007 ruled out live rendering for latency, IME and undo reasons.
+
+**Options.** Markers always visible but dimmed (simplest; what's on screen is what's saved) · hidden except near the caret, like Obsidian's live preview (relayout on every caret move) · **always hidden**.
+
+**Decision.**
+- The panel editor styles inline Markdown: bold, italic, bold italic, strikethrough, inline code and `[text](url)` links, whether typed, pasted, restored or added by a shortcut. Headings, lists, quotes and other block syntax aren't styled.
+- A complete span's markers are always hidden, a link's URL included. An unclosed span shows as typed. A link shows raw only while the selection is in its destination (`⌘K`).
+- Styling and hiding are display-only. The `NSTextView` stays plain text (`isRichText = false`); styles and hiding are text-storage attributes set by a delegate from the spans a pure OtterCore parser (`MarkdownStyling`) returns. The string, the draft, the outbox and the delivered file never change.
+- Editing treats hidden markers as part of their span, never as characters on their own: the caret skips them, typing at an edge takes the style on its left, `⌫`/`⌦` never delete a lone marker, a partly deleted span keeps its markers, and copy writes balanced Markdown (UX_SPEC §1). These rules are pure OtterCore functions with tests.
+- Each edit parses the whole note and re-attributes only the lines whose styling changed. Nothing restyles during IME composition. Attribute changes aren't undo steps.
+- VoiceOver reads the saved Markdown, markers included.
+
+**Consequences.** The editor looks like a rich-text editor for inline styles, so it has to behave like one: `EditorTextView` overrides caret movement, selection, deletion, typing over a selection, line breaks and copy, which is the riskiest part of the feature. ADR-007's concerns are handled rather than avoided: latency by the small, line-local re-attribution (budget in ARCHITECTURE §9), IME by waiting for composition to commit, undo by never touching characters outside the user's edit. Editing a link's URL needs `⌘K`. Emphasis doesn't span a line break, unlike Obsidian.

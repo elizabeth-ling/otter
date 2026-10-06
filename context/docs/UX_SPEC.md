@@ -80,6 +80,57 @@ The `●` in the header is the destination dot (colored per destination), next t
 | Saving | Nothing — the panel closes immediately on `⌘↩` (optimistic) |
 | Delivery failed | Menu bar icon gets an amber badge; macOS notification once per failure burst; badge in panel footer next open |
 
+### Inline Markdown styling
+
+The note stays plain Markdown. The editor styles inline Markdown as it's typed, pasted, restored from a draft or added by a shortcut, and hides the markers of every complete span (ADR-016). Styling and hiding are display-only: what's drafted, saved and delivered is exactly the text with its markers.
+
+| Markdown | Shown as |
+|---|---|
+| `**bold**`, `__bold__` | **bold** |
+| `*italic*`, `_italic_` | *italic* |
+| `***both***`, `**_both_**` | bold italic |
+| `~~struck~~` | struck through |
+| `` `code` `` (any run of backticks) | `code` in the monospaced system font at the editor's size, faint background (`quaternarySystemFill`) over the code only |
+| `[text](url)` | `text` in the link colour, underlined; the URL shows as a tooltip on hover. Not clickable: a click places the caret |
+
+**What's styled**
+
+- Styles combine: bold inside a link, struck-through italic. Nothing inside inline code is styled.
+- Rules follow CommonMark/GFM as Obsidian renders them, within one line: a span never crosses a line break; `\*` is a literal `*` (the backslash stays visible); `_` doesn't open or close inside a word (`snake_case_name` stays plain); an unclosed marker, or one with a space just inside (`** x **`), is plain text.
+- Lines inside a fenced code block (```` ``` ```` or `~~~`) aren't styled.
+- Not styled, shown as typed: headings, list and task markers, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML.
+- Follows the Font setting (§5): bold and italic are faces of the chosen font; with Monospaced, inline code keeps only its background.
+
+**When markers hide**
+
+- Only a complete span's markers hide: `**`, `*`, `_`, `~~`, backticks, and a link's `[` and `](url)`. Hidden markers take no space.
+- An unclosed span shows its markers as typed: `**abc` stays `**abc`. The moment the closing marker is typed, both hide and the caret sits after the span, so what's typed next is plain. (Typing `**abc**` shows `*`*abc* for a moment after the first closing `*`, as in Obsidian.)
+- An empty pair (`****`, ` `` `) isn't a span and shows as typed, so `⌘B` with nothing to bold inserts a visible `****` with the caret between; the first character typed hides the markers and continues bold.
+- A link's raw Markdown shows while the selection is inside its destination: after `⌘K` selects `url`, or after `⌘K` with the caret in an existing link, which selects its URL to type over. The markers and URL then show as typed, URL in `secondaryLabelColor`, until the selection leaves the link.
+
+**Caret and typing**
+
+- The caret never stops inside or beside a hidden marker as a separate position. `←` / `→` move one visible character, skipping hidden markers, so every press moves the caret. Clicks, `↑` / `↓`, word and line movement land on the nearest visible position.
+- At a span's edge, typing takes the style of the visible character before the caret, as in a word processor: at the end of `**bold**` it continues bold; at its start it's plain.
+- Two exceptions put the caret after a span's closing marker, so typing is plain: having just typed the closing marker, and pressing the span's shortcut (`⌘B`, `⌘I`, `⇧⌘X`, `⌘E`) with the caret at its end. Either lasts until the caret moves.
+- `↩` (or a pasted line break) inside a span splits it: `**ab|c**` becomes `**ab**⏎**c**`. At a span's end, the line break goes after the closing marker.
+- A non-empty selection never starts or ends inside hidden markers; its highlight covers visible characters only.
+
+**Deleting, replacing, copying**
+
+- `⌫` / `⌦` delete the visible character before / after the caret, never a hidden marker on its own, so ordinary editing can't half-break a style. Deleting a span's last visible character removes its markers too. A style is taken off with its shortcut, caret in the span or text selected.
+- Deleting or cutting a selection removes every span whose visible text is all selected, markers included. A span only partly selected keeps its markers: deleting `x **ab` from `x **abc**` leaves `**c**`, still bold.
+- Typing or pasting over a selection does the same, and the new text takes the style of the first selected character, so typing over a selected bold word keeps it bold.
+- Copy, cut and drag put plain Markdown on the pasteboard, closing and reopening any partly selected span so it pastes looking the same: copying `ab` from `**abc**` gives `**ab**`. Paste is still plain text; pasted Markdown is styled and its markers hide.
+- Select All, double-click and triple-click select as usual; the rules above decide which markers go with the selection.
+
+**Undo, IME, spelling, VoiceOver**
+
+- Styling and hiding are never undo steps. `⌘Z` brings back the text, and its styling follows; undoing the closing marker you just typed shows the markers again.
+- While an input method is composing, nothing restyles or hides; the text restyles once it's committed.
+- Spell checking works as before; hidden markers are punctuation and aren't checked. It still runs inside inline code.
+- VoiceOver reads the saved Markdown, markers included (ADR-016).
+
 ## 2. Keyboard map
 
 | Shortcut | Scope | Action |
@@ -95,14 +146,14 @@ The `●` in the header is the destination dot (colored per destination), next t
 | `⇧⌘O` | Panel | Change the save folder (same as clicking the folder name in the header) |
 | `⌘V` | Panel | Paste as plain text; files, then images become attachments (formatted text with a picture of itself stays text; concealed pasteboard content is never attached) |
 | `⇧⌥⌘V` | Panel | Paste with original formatting converted to Markdown *(stretch)* |
-| `⌘B` / `⌘I` | Panel | Bold `**…**` / italic `*…*` on the selection, or the word the caret is in; elsewhere inserts an empty pair with the caret between. Pressed again, removes it |
+| `⌘B` / `⌘I` | Panel | Bold `**…**` / italic `*…*` on the selection, or the word the caret is in; elsewhere inserts an empty pair with the caret between. Pressed again, removes it; with the caret at the end of a bold / italic span, moves it past the span so typing is plain |
 | `⇧⌘X` | Panel | Strikethrough `~~…~~`, the same way |
 | `⌘E` | Panel | Inline code `` `…` ``, the same way |
-| `⌘K` | Panel | Link: `[selection](url)` with `url` selected to type over. A URL on the clipboard is used instead, caret after the link; a selected URL becomes `[](URL)` with the caret in the brackets |
+| `⌘K` | Panel | Link: `[selection](url)` with `url` selected to type over (the link shows raw while you do). A URL on the clipboard is used instead, caret after the link; a selected URL becomes `[](URL)` with the caret in the brackets. In an existing link, shows it raw and selects its URL |
 | `⌘,` | Panel | Open Settings |
 | `⌘Z` / `⇧⌘Z` | Panel | Undo / redo |
 
-The formatting shortcuts only add or remove Markdown markers; the text is never styled (rich text is a non-goal). Each is one `⌘Z` step. Surrounding spaces stay outside the markers, a selection across lines is done line by line (blank lines skipped, list and quote markers left outside), and bold and italic nest (`***both***`) rather than undoing each other.
+The formatting shortcuts only add or remove Markdown markers; the editor then styles the text and hides the markers, the same as typed Markdown (§1, Inline Markdown styling). Each is one `⌘Z` step. Surrounding spaces stay outside the markers, a selection across lines is done line by line (blank lines skipped, list and quote markers left outside), and bold and italic nest (`***both***`) rather than undoing each other.
 
 Clicking outside the panel closes it (keeps the draft). Setting: "Keep panel open when clicking elsewhere".
 
