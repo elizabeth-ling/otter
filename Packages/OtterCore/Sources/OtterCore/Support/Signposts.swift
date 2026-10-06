@@ -8,4 +8,8 @@ public enum Signpost {
 
     /// Begun by `PanelController` when a toggle press shows the panel; ended once the panel is key.
     public static let hotkeyToVisible: StaticString = "hotkey→visible"
+
+    /// One inline-styling pass in the panel's editor (ADR-016): parse the note, re-attribute the
+    /// lines whose styling changed. Budget: < 1 ms for a 10 KB note.
+    public static let restyle: StaticString = "restyle"
 }
