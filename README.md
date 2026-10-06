@@ -2,9 +2,8 @@
 
  otter is a FOS macOS menu-bar utility for capturing notes. what quick notes should've been. press a hotkey from anywhere, a small floating panel appears, type, hit `⌘↩`, and the note is filed into the notes system of your choice
 
- currently, there is support for Obsidian and plain folders. Apple Notes is planned for after the first release
+ connects to obsidian and Apple native folders. 
 
-Otter is NOT a notes app.
 No account. No backend. Your data stays on your Mac by default.
 
 
@@ -31,7 +30,7 @@ No account. No backend. Your data stays on your Mac by default.
 | T04 | [Editor, keyboard map, draft autosave](context/tasks/T04-editor-and-drafts.md) | M0 |
 | T05 | [Capture pipeline and outbox](context/tasks/T05-capture-pipeline-outbox.md) | M0 |
 | T06 | [Folder destination](context/tasks/T06-folder-destination.md) | M0 |
-| T07 | [Obsidian destination](context/tasks/T07-obsidian-destination.md) | M1 |
+| T07 | [Obsidian vault awareness](context/tasks/T07-obsidian-destination.md) | M1 |
 | T08 | [Apple Notes destination](context/tasks/T08-apple-notes-destination.md) | M3 (after v1) |
 | T09 | [Paste handling and attachments](context/tasks/T09-paste-and-attachments.md) | M1 |
 | T10 | [Settings and first-run onboarding](context/tasks/T10-settings-and-onboarding.md) | M2 |
@@ -39,3 +38,7 @@ No account. No backend. Your data stays on your Mac by default.
 | T12 | [Menu bar item, recents, launch at login](context/tasks/T12-menubar-and-lifecycle.md) | M2 |
 | T13 | [Packaging, notarization, updates](context/tasks/T13-packaging-and-distribution.md) | M2 |
 | T14 | [Performance and reliability hardening](context/tasks/T14-performance-and-reliability.md) | M2 |
+| T15 | [Sticky-note panel: shape, dragging, remembered position](context/tasks/T15-sticky-note-panel.md) | M0 |
+| T16 | [`⌘S`: save as a named note and start a new one](context/tasks/T16-save-as-named-note.md) | M1 |
+| T17 | [Change the save folder from the panel header](context/tasks/T17-change-folder-from-panel.md) | M1 |
+| T18 | [Bulleted lists and checkboxes in the editor](context/tasks/T18-md-lists-and-checkboxes.md) | M1 |
