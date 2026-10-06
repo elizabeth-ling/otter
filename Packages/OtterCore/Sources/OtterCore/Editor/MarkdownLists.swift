@@ -63,7 +63,7 @@ public struct MarkdownListItem: Hashable, Sendable {
 
     /// Whether `selection` touches the item's line: a caret anywhere on it, or a selection with
     /// a character on it. A selection that ends just after the line break before it doesn't.
-    /// These are the lines that show their raw marker.
+    /// These are the lines `Tab` and `⇧Tab` act on.
     public func isOnLine(touchedBy selection: NSRange) -> Bool {
         guard selection.location <= NSMaxRange(contentRange) else {
             return false
@@ -72,6 +72,17 @@ public struct MarkdownListItem: Hashable, Sendable {
             return selection.location >= lineRange.location
         }
         return NSMaxRange(selection) > lineRange.location
+    }
+
+    /// Whether `selection` shows the item's raw marker (ADR-018): a caret in its prefix, before
+    /// the start of its text, or a selection with a character of the marker. A caret at the start
+    /// of the text, where typing goes, doesn't, so the bullet or box stays drawn there.
+    public func revealsMarker(for selection: NSRange) -> Bool {
+        if selection.length == 0 {
+            return selection.location >= prefixRange.location && selection.location < NSMaxRange(prefixRange)
+        }
+        let marker = markerRange
+        return selection.location < NSMaxRange(marker) && NSMaxRange(selection) > marker.location
     }
 }
 

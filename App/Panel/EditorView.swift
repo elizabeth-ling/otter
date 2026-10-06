@@ -183,8 +183,6 @@ final class EditorTextView: NSTextView {
     /// Set while an edit's computed selection is applied: list markers on its lines count as
     /// revealed, so it isn't snapped as an arrival.
     private var isSelectingEditResult = false
-    /// SF Symbol boxes for tasks, at the editor font's size.
-    private var checkboxImages: (pointSize: CGFloat, empty: NSImage, checked: NSImage)?
 
     /// Dragging in the text selects text; it never moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
@@ -383,7 +381,7 @@ final class EditorTextView: NSTextView {
         applyListCommand(.outdent, actionName: "Outdent")
     }
 
-    /// Redraws the bullets and boxes, and their arrow cursor, after the text, the reveal or the
+    /// Redraws the bullets and circles, and their arrow cursor, after the text, the reveal or the
     /// font changed.
     fileprivate func listMarkersDidChange() {
         needsDisplay = true
@@ -533,6 +531,11 @@ final class EditorTextView: NSTextView {
                 caret = forward ? NSMaxRange(selection) : selection.location
             } else {
                 caret = forward ? rules.nextCaretStop(after: selection.location) : rules.previousCaretStop(before: selection.location)
+                // `←` from an item's text steps into its hidden marker, which then shows (ADR-018);
+                // snapping by the marker as it looked before would put the caret back.
+                if !forward, caret != rules.caretStop(caret) {
+                    pinnedCaret = caret
+                }
             }
             setSelectedRange(NSRange(location: caret, length: 0))
             scrollRangeToVisible(NSRange(location: caret, length: 0))
@@ -802,19 +805,19 @@ final class EditorTextView: NSTextView {
         (placeholder as NSString).draw(at: origin, withAttributes: attributes)
     }
 
-    // MARK: Bullets and checkboxes (ADR-017)
+    // MARK: Bullets and checkboxes (ADR-017, ADR-018)
 
-    /// A drawn bullet or box: an item whose line isn't revealed, where its first line sits.
+    /// A drawn bullet or circle: an item whose marker isn't revealed, where its first line sits.
     private struct ListMarker {
         let item: MarkdownListItem
-        /// The x of the item's text start, in view coordinates.
-        let textStart: CGFloat
+        /// The x where the item's level starts, in view coordinates.
+        let levelStart: CGFloat
         /// The first line's baseline, in view coordinates.
         let baseline: CGFloat
     }
 
-    /// The bullets and boxes to draw in `rect`: the items there whose line the selection doesn't
-    /// touch. Uses TextKit 2's layout fragments only; touching `layoutManager` would switch the
+    /// The bullets and circles to draw in `rect`: the items there whose marker the selection isn't
+    /// in. Uses TextKit 2's layout fragments only; touching `layoutManager` would switch the
     /// view to TextKit 1.
     private func listMarkers(in rect: NSRect) -> [ListMarker] {
         guard let styler, let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else {
@@ -838,7 +841,7 @@ final class EditorTextView: NSTextView {
             if let item = Self.item(startingAt: location, in: items), !styler.isRevealed(item), let line = fragment.textLineFragments.first {
                 markers.append(ListMarker(
                     item: item,
-                    textStart: origin.x + padding + styler.textStart(level: item.level),
+                    levelStart: origin.x + padding + styler.levelStart(level: item.level),
                     baseline: origin.y + frame.minY + line.typographicBounds.minY + line.glyphOrigin.y
                 ))
             }
@@ -861,73 +864,68 @@ final class EditorTextView: NSTextView {
         return low < items.count && items[low].lineRange.location == location ? items[low] : nil
     }
 
-    /// `•` in `secondaryLabelColor` where the `-` would be, or a box in the accent colour, sized
-    /// from the editor font and sitting on the first line's baseline.
+    /// A bullet is a solid grey dot, 0.28 em across, centred on the x-height. A task is a 0.94 em
+    /// circle centred on the capitals: a grey ring, or filled with the accent colour and a white
+    /// check. Both are centred 0.87 em past the level's start, as measured from Obsidian (ADR-018).
     private func draw(_ marker: ListMarker) {
         guard let styler else {
             return
         }
         switch marker.item.kind {
         case .bullet:
-            let bullet = "•"
-            let x = marker.textStart - styler.width(of: "- ") + (styler.width(of: "-") - styler.width(of: bullet)) / 2
-            drawText(bullet, at: CGPoint(x: x, y: marker.baseline), color: .secondaryLabelColor, font: styler.font)
+            let em = styler.font.pointSize
+            let center = CGPoint(x: marker.levelStart + Self.markerCenterOffset * em, y: marker.baseline - styler.font.xHeight / 2)
+            let diameter = Self.bulletDiameter * em
+            NSColor.tertiaryLabelColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: center.x - diameter / 2, y: center.y - diameter / 2, width: diameter, height: diameter)).fill()
         case let .task(checked):
-            guard let images = checkboxImages(for: styler.font) else {
-                return
+            let circle = circleRect(for: marker)
+            if checked {
+                NSColor.controlAccentColor.setFill()
+                NSBezierPath(ovalIn: circle).fill()
+                let d = circle.width
+                let check = NSBezierPath()
+                check.move(to: CGPoint(x: circle.midX - 0.22 * d, y: circle.midY + 0.01 * d))
+                check.line(to: CGPoint(x: circle.midX - 0.06 * d, y: circle.midY + 0.16 * d))
+                check.line(to: CGPoint(x: circle.midX + 0.23 * d, y: circle.midY - 0.15 * d))
+                check.lineWidth = max(1.5, 0.1 * d)
+                check.lineCapStyle = .round
+                check.lineJoinStyle = .round
+                NSColor.white.setStroke()
+                check.stroke()
+            } else {
+                let ring = NSBezierPath(ovalIn: circle.insetBy(dx: 0.5, dy: 0.5))
+                ring.lineWidth = 1
+                NSColor.tertiaryLabelColor.setStroke()
+                ring.stroke()
             }
-            (checked ? images.checked : images.empty).draw(in: boxRect(for: marker), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         }
     }
 
-    /// Draws `string` with its baseline at `point` (this view is flipped).
-    private func drawText(_ string: String, at point: CGPoint, color: NSColor, font: NSFont) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            return
-        }
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true]
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
-        context.saveGState()
-        context.setFillColor(color.cgColor)
-        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
-        context.textPosition = point
-        CTLineDraw(line, context)
-        context.restoreGState()
-    }
-
-    /// A task's box: in the gutter, 0.4 em left of the text, centred on the capitals.
-    private func boxRect(for marker: ListMarker) -> NSRect {
-        guard let styler, let images = checkboxImages(for: styler.font) else {
+    /// A task's circle: centred where a bullet is across, and on the capitals.
+    private func circleRect(for marker: ListMarker) -> NSRect {
+        guard let styler else {
             return .zero
         }
-        let size = images.empty.size
         let font = styler.font
-        let midX = marker.textStart - 0.4 * font.pointSize - size.width / 2
+        let diameter = Self.circleDiameter * font.pointSize
+        let midX = marker.levelStart + Self.markerCenterOffset * font.pointSize
         let midY = marker.baseline - font.capHeight / 2
-        return NSRect(x: midX - size.width / 2, y: midY - size.height / 2, width: size.width, height: size.height)
+        return NSRect(x: midX - diameter / 2, y: midY - diameter / 2, width: diameter, height: diameter)
     }
 
-    /// Where a press on a box ticks it: the box, grown to at least 20 × 20 pt.
+    /// Where a press on a circle ticks it: the circle, grown to at least 20 × 20 pt.
     private func hitRect(for marker: ListMarker) -> NSRect {
-        let box = boxRect(for: marker)
-        return box.insetBy(dx: min(0, (box.width - 20) / 2), dy: min(0, (box.height - 20) / 2))
+        let circle = circleRect(for: marker)
+        return circle.insetBy(dx: min(0, (circle.width - 20) / 2), dy: min(0, (circle.height - 20) / 2))
     }
 
-    private func checkboxImages(for font: NSFont) -> (empty: NSImage, checked: NSImage)? {
-        if let cached = checkboxImages, cached.pointSize == font.pointSize {
-            return (cached.empty, cached.checked)
-        }
-        let configuration = NSImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [.controlAccentColor]))
-        guard let empty = NSImage(systemSymbolName: "square", accessibilityDescription: nil)?.withSymbolConfiguration(configuration),
-              let checked = NSImage(systemSymbolName: "checkmark.square.fill", accessibilityDescription: nil)?.withSymbolConfiguration(configuration) else {
-            return nil
-        }
-        checkboxImages = (font.pointSize, empty, checked)
-        return (empty, checked)
-    }
+    /// Sizes and positions in em of the editor font, measured from Obsidian (ADR-018).
+    private static let markerCenterOffset: CGFloat = 0.87
+    private static let bulletDiameter: CGFloat = 0.28
+    private static let circleDiameter: CGFloat = 0.94
 
-    /// The drawn box under `point`, if any. None while an input method is composing.
+    /// The drawn circle under `point`, if any. None while an input method is composing.
     private func checkbox(at point: NSPoint) -> ListMarker? {
         guard !hasMarkedText() else {
             return nil
@@ -935,7 +933,7 @@ final class EditorTextView: NSTextView {
         return listMarkers(in: visibleRect).first { $0.item.isTask && hitRect(for: $0).contains(point) }
     }
 
-    /// A press on a drawn box ticks or unticks it on mouse-up inside the box, without moving the
+    /// A press on a drawn circle ticks or unticks it on mouse-up inside it, without moving the
     /// caret. A press that turns into a drag selects text as usual.
     override func mouseDown(with event: NSEvent) {
         guard let window, let marker = checkbox(at: convert(event.locationInWindow, from: nil)) else {
@@ -966,7 +964,7 @@ final class EditorTextView: NSTextView {
         applyListEdit(edit, actionName: item.isChecked ? "Uncheck" : "Check", scrolls: false)
     }
 
-    /// The arrow over each drawn box.
+    /// The arrow over each drawn circle.
     override func resetCursorRects() {
         super.resetCursorRects()
         for marker in listMarkers(in: visibleRect) where marker.item.isTask {

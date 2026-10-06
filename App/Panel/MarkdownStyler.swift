@@ -11,9 +11,9 @@ import os
 /// marker gets a near-zero font and a clear colour, which needs no layout-manager code and works
 /// the same on TextKit 1 and 2 (the spike found no visible gap, and caret and line heights unchanged).
 ///
-/// `- ` bullets and `- [ ]` tasks (ADR-017) are indented by level with a hanging indent. Their
-/// indentation is always hidden. On the lines the selection touches, the marker shows raw and dim,
-/// hanging in the gutter; elsewhere it's hidden too and `EditorTextView` draws a bullet or box.
+/// `- ` bullets and `- [ ]` tasks (ADR-017, ADR-018) are indented by level with a hanging indent.
+/// Their indentation is always hidden. While the selection is in an item's marker, the marker
+/// shows raw and dim; otherwise it's hidden too and `EditorTextView` draws a bullet or circle.
 /// Item paragraphs have no tab stops and a 0.001 pt tab interval, so hidden tabs take no space (the
 /// T18 spike: default stops push the text up to 80 pt; this lines up within 0.04 pt on TextKit 1
 /// and 2; an interval of 0 breaks TextKit 2's layout). A tab inside an item's text takes none either.
@@ -51,7 +51,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     private var fonts: [Traits: NSFont] = [:]
     /// The list items of the text as last parsed.
     private var items: [MarkdownListItem] = []
-    /// The editor's selection: items on the lines it touches show their raw marker.
+    /// The editor's selection: items whose marker it's in show their raw marker.
     private var itemSelection = NSRange(location: 0, length: 0)
     private var markerWidths: [String: CGFloat] = [:]
     private var paragraphStyles: [ListStyle: NSParagraphStyle] = [:]
@@ -82,18 +82,29 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         return items
     }
 
-    /// Whether `item` shows its raw marker: the selection touches its line.
+    /// Whether `item` shows its raw marker: the selection is in it.
     func isRevealed(_ item: MarkdownListItem) -> Bool {
-        item.isOnLine(touchedBy: itemSelection)
+        item.revealsMarker(for: itemSelection)
     }
 
-    /// Where an item's text starts, from the text container's edge: one step per level, plus the
-    /// gutter, which fits `- [x] ` and `- [X] `. Step and gutter are about 1.5 em.
-    func textStart(level: Int) -> CGFloat {
-        let em = font.pointSize
-        let gutter = max(width(of: "- [x] "), width(of: "- [X] "), 1.5 * em)
-        return CGFloat(level) * 1.5 * em + gutter
+    /// Where an item at `level` starts, from the text container's edge: one step per level. The
+    /// step is the indent from plain text to a bullet's text, 1.34 em, as in Obsidian (ADR-018).
+    func levelStart(level: Int) -> CGFloat {
+        CGFloat(level) * Self.bulletTextOffset * font.pointSize
     }
+
+    /// Where an item's text starts: 1.34 em past its level's start for a bullet, 1.75 em for a
+    /// task, measured from Obsidian (ADR-018).
+    func textStart(of item: MarkdownListItem) -> CGFloat {
+        textStart(level: item.level, isTask: item.isTask)
+    }
+
+    private func textStart(level: Int, isTask: Bool) -> CGFloat {
+        levelStart(level: level) + (isTask ? Self.taskTextOffset : Self.bulletTextOffset) * font.pointSize
+    }
+
+    private static let bulletTextOffset: CGFloat = 1.34
+    private static let taskTextOffset: CGFloat = 1.75
 
     /// `string`'s width in the editor's font, tabs taking no space as in an item.
     func width(of string: String) -> CGFloat {
@@ -106,9 +117,9 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         return width
     }
 
-    /// Moves the list reveal to the lines `selection` touches, re-attributing only the items whose
-    /// lines start or stop showing their marker. Not an edit: no undo step, no re-wrap. Returns
-    /// whether any line changed, so the editor redraws its bullets and boxes.
+    /// Moves the list reveal to the items whose marker `selection` is in, re-attributing only the
+    /// items that start or stop showing their marker. Not an edit: no undo step. Returns whether
+    /// any line changed, so the editor redraws its bullets and circles.
     @discardableResult
     func revealItems(on selection: NSRange) -> Bool {
         let old = itemSelection
@@ -116,7 +127,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         guard let textStorage, !isComposing, !isStale, old != selection, !items.isEmpty else {
             return false
         }
-        let changed = items.filter { $0.isOnLine(touchedBy: old) != $0.isOnLine(touchedBy: selection) }
+        let changed = items.filter { $0.revealsMarker(for: old) != $0.revealsMarker(for: selection) }
         guard !changed.isEmpty else {
             return false
         }
@@ -314,7 +325,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         }
         var list: ListStyle?
         if let item {
-            // Indentation is always hidden; the marker only where the selection isn't.
+            // Indentation is always hidden; the marker unless the selection is in it.
             let revealed = isRevealed(item)
             mark(revealed ? item.indentRange : item.prefixRange, .hidden)
             if revealed {
@@ -323,7 +334,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             if item.isChecked {
                 mark(item.contentRange, .checked)
             }
-            list = ListStyle(level: item.level, revealedMarker: revealed ? ns.substring(with: item.markerRange) : nil)
+            list = ListStyle(level: item.level, isTask: item.isTask, revealedMarker: revealed ? ns.substring(with: item.markerRange) : nil)
         }
 
         var runs: [LineStyle.Run] = []
@@ -358,17 +369,18 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         }
     }
 
-    /// An item's paragraph: wrapped lines hang at its text start, which doesn't move when the line
-    /// is revealed; a revealed marker starts that much to the left, in the gutter.
+    /// An item's paragraph: wrapped lines hang at its text start. A revealed marker ends at the
+    /// text start if it fits after the level's start (`- `); otherwise (`- [ ] `) it starts there
+    /// and pushes the first line's text right, as in Obsidian.
     private func paragraphStyle(for list: ListStyle) -> NSParagraphStyle {
         if let cached = paragraphStyles[list] {
             return cached
         }
         let style = Self.tablessParagraph.mutableCopy() as! NSMutableParagraphStyle
-        let textStart = textStart(level: list.level)
+        let textStart = textStart(level: list.level, isTask: list.isTask)
         style.headIndent = textStart
         let markerWidth = list.revealedMarker.map { width(of: $0) } ?? 0
-        style.firstLineHeadIndent = max(textStart - markerWidth, 0)
+        style.firstLineHeadIndent = max(textStart - markerWidth, levelStart(level: list.level))
         paragraphStyles[list] = style
         return style
     }
@@ -476,15 +488,16 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         /// A revealed link's URL.
         static let url = Traits(rawValue: 1 << 5)
         static let hidden = Traits(rawValue: 1 << 6)
-        /// A list marker shown raw, on a line the selection touches.
+        /// A list marker shown raw, while the selection is in it.
         static let marker = Traits(rawValue: 1 << 7)
         /// A checked task's text.
         static let checked = Traits(rawValue: 1 << 8)
     }
 
-    /// An item line's layout: its level, and its raw marker if the line is revealed.
+    /// An item line's layout: its level and kind, and its raw marker if it's revealed.
     private struct ListStyle: Hashable {
         let level: Int
+        let isTask: Bool
         let revealedMarker: String?
     }
 

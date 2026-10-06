@@ -5,10 +5,11 @@ import Foundation
 /// them, `⌫` / `⌦` never delete one alone, a partly deleted span keeps its markers and copy writes
 /// balanced Markdown.
 ///
-/// List items (ADR-017) follow their own rules: an item's prefix is hidden except on the lines the
-/// selection touches, where only its indentation is. A hidden prefix snaps the caret forward to the
-/// item's text, so arriving on an item puts the caret there; once revealed, the marker is ordinary
-/// text. `↩`, `⌫` at the start of the text and `⌦` at its end continue, unmark and join items.
+/// List items (ADR-017, ADR-018) follow their own rules: an item's prefix is hidden unless the
+/// selection is in its marker, when only its indentation is. A hidden prefix snaps the caret
+/// forward to the item's text, so arriving on an item puts the caret there; `←` from there steps
+/// into the marker, which reveals it, and a revealed marker is ordinary text. `↩`, `⌫` at the start
+/// of the text and `⌦` at its end continue, unmark and join items.
 ///
 /// Each rule is a function of the text, its spans and items, and a selection. Ranges are UTF-16, as
 /// `NSTextView` counts them. Edits are `MarkdownEdit`s, applied by the editor as one undo step.
@@ -37,8 +38,8 @@ public struct HiddenMarkerEditing {
     ///     are plain text, as for pasted text.
     ///   - linkSelection: A selection inside a link's destination reveals that link: its markers
     ///     show, so they aren't hidden runs.
-    ///   - selection: The selection on screen. Items on the lines it touches show their marker, so
-    ///     only their indentation is hidden.
+    ///   - selection: The selection on screen. Items whose marker it's in show their marker, so
+    ///     only their indentation is hidden (`MarkdownListItem.revealsMarker(for:)`).
     public init(
         text: String,
         spans: [MarkdownSpan]? = nil,
@@ -52,7 +53,7 @@ public struct HiddenMarkerEditing {
         self.items = items
         self.inlineRuns = MarkdownStyling.hiddenRuns(of: self.spans, revealing: linkSelection)
         self.listRuns = items.compactMap { item in
-            if let selection, item.isOnLine(touchedBy: selection) {
+            if let selection, item.revealsMarker(for: selection) {
                 return item.indentRange.length > 0 ? ListRun(range: item.indentRange, isIndentation: true) : nil
             }
             return ListRun(range: item.prefixRange, isIndentation: false)
@@ -113,7 +114,9 @@ public struct HiddenMarkerEditing {
     }
 
     /// `←`: one visible character back, skipping hidden runs. Stays put only at the start. From
-    /// just after hidden indentation or a hidden prefix, it goes to the end of the line above.
+    /// the start of an item's text with its prefix hidden, it steps into the marker, before its
+    /// last space, which reveals it. From just after hidden indentation it goes to the end of the
+    /// line above.
     public func previousCaretStop(before position: Int) -> Int {
         let stop = caretStop(position)
         guard stop > 0 else {
@@ -121,6 +124,9 @@ public struct HiddenMarkerEditing {
         }
         let candidate = ns.rangeOfComposedCharacterSequence(at: stop - 1).location
         if let run = listRun(containing: candidate) {
+            if !run.isIndentation, stop == NSMaxRange(run.range) {
+                return stop - 1
+            }
             guard run.range.location > 0 else {
                 return stop
             }

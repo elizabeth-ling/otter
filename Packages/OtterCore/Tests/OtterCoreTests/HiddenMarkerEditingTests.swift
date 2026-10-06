@@ -494,9 +494,28 @@ private func listCopied(_ marked: String) -> String {
     #expect(rules.caretStop(1) == 1)
 }
 
-@Test func onTheItemsOwnLineOnlyItsIndentationIsHidden() {
+@Test func onlyACaretInTheMarkerRevealsIt() {
+    // "x⏎\t- [ ] jam": the prefix is 2..<9, the marker 3..<9, the text starts at 9.
     let text = "x\n\t- [ ] jam"
-    let rules = listEditing(text, selection: NSRange(location: 10, length: 0))
+    let hidden = [NSRange(location: 2, length: 7)]
+    let revealed = [NSRange(location: 2, length: 1)]
+    for position in 2...8 {
+        #expect(listEditing(text, selection: NSRange(location: position, length: 0)).hiddenRuns == revealed, "position \(position)")
+    }
+    // At the start of the text, in the text, or on another line, the box stays drawn.
+    for position in [0, 9, 10, 12] {
+        #expect(listEditing(text, selection: NSRange(location: position, length: 0)).hiddenRuns == hidden, "position \(position)")
+    }
+    // A selection reveals it only if it has a character of the marker.
+    #expect(listEditing(text, selection: NSRange(location: 8, length: 2)).hiddenRuns == revealed)
+    #expect(listEditing(text, selection: NSRange(location: 0, length: 4)).hiddenRuns == revealed)
+    #expect(listEditing(text, selection: NSRange(location: 9, length: 3)).hiddenRuns == hidden)
+    #expect(listEditing(text, selection: NSRange(location: 0, length: 3)).hiddenRuns == hidden)
+}
+
+@Test func inARevealedMarkerOnlyTheIndentationIsHidden() {
+    let text = "x\n\t- [ ] jam"
+    let rules = listEditing(text, selection: NSRange(location: 6, length: 0))
     #expect(rules.hiddenRuns == [NSRange(location: 2, length: 1)])
     // Before the `-`, and inside `[ ]`.
     #expect(rules.caretStop(3) == 3)
@@ -507,19 +526,20 @@ private func listCopied(_ marked: String) -> String {
 
 @Test func aPositionInARevealedLinesIndentationSnapsToJustBeforeTheDash() {
     // "x⏎\t\t- a": indentation 2..<4, `-` at 4.
-    let rules = listEditing("x\n\t\t- a", selection: NSRange(location: 6, length: 0))
+    let rules = listEditing("x\n\t\t- a", selection: NSRange(location: 5, length: 0))
     #expect(rules.caretStop(2) == 4)
     #expect(rules.caretStop(3) == 4)
     #expect(rules.caretStop(4) == 4)
 }
 
-@Test func leftStepsThroughARevealedMarkerThenToTheLineAbove() {
-    // "ab⏎\t- [ ] c": `-` at 4, text at 10.
+@Test func leftStepsIntoTheMarkerThroughItThenToTheLineAbove() {
+    // "ab⏎\t- [ ] c": `-` at 4, text at 10. The rules follow the caret, as in the editor, so the
+    // first `←` steps into the hidden marker, which reveals it.
     let text = "ab\n\t- [ ] c"
-    let revealed = listEditing(text, selection: NSRange(location: 10, length: 0))
     var stops = [10]
     while true {
-        let previous = revealed.previousCaretStop(before: stops.last!)
+        let rules = listEditing(text, selection: NSRange(location: stops.last!, length: 0))
+        let previous = rules.previousCaretStop(before: stops.last!)
         guard previous != stops.last else {
             break
         }
@@ -536,7 +556,7 @@ private func listCopied(_ marked: String) -> String {
         NSRange(location: 0, length: 2), NSRange(location: 2, length: 2), NSRange(location: 5, length: 2),
     ])
     // Revealed: stops before `-`, before the space, and at 2 (before the hidden `**`); 4 snaps back to 2.
-    let revealed = listEditing("- **b**", selection: NSRange(location: 5, length: 0))
+    let revealed = listEditing("- **b**", selection: NSRange(location: 1, length: 0))
     #expect((0...4).map(revealed.caretStop) == [0, 1, 2, 2, 2])
     #expect(revealed.nextCaretStop(after: 0) == 1)
     #expect(revealed.nextCaretStop(after: 1) == 2)
