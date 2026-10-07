@@ -41,6 +41,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     /// `⌘,` in the panel and "Settings…" in the menu bar. Brings onboarding back if it's open.
     func showSettings(tab: Router.Tab? = nil) {
+        // Onboarding finished or was closed: the tabs replace it now, not while its window closed.
+        if router.mode == .onboarding, window?.isVisible != true {
+            router.mode = .settings
+        }
         if let tab, router.mode == .settings {
             router.tab = tab
         }
@@ -65,10 +69,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - NSWindowDelegate
 
+    /// Leaves the content as it is: swapping onboarding for the tabs here would lay the tabs out in
+    /// a closing window ("Invalid view geometry: width is negative"). `showSettings` swaps them.
     func windowWillClose(_ notification: Notification) {
         if router.mode == .onboarding {
             onboarding.windowWillClose()
-            router.mode = .settings
         }
         model.windowWillClose()
     }
