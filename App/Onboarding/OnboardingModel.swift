@@ -35,6 +35,9 @@ final class OnboardingModel {
     @ObservationIgnored private var deliveryTask: Task<Void, Never>?
 
     private(set) var step = Step.hotkey
+    /// Only the hotkey step, from the menu bar's "Finish setting up ⌘Space…" (T12). Continuing
+    /// closes the window; the destination and launch at login are left as they are.
+    private(set) var isHotkeyOnly = false
 
     // MARK: Step 1
 
@@ -66,12 +69,17 @@ final class OnboardingModel {
     }
 
     /// From the first step. Pre-selects the vault opened most recently, if there is one.
-    func start() {
+    /// - Parameter hotkeyOnly: Show only the hotkey step.
+    func start(hotkeyOnly: Bool = false) {
         step = .hotkey
+        isHotkeyOnly = hotkeyOnly
         lastPress = nil
         firstDelivery = nil
         launchAtLogin = settings.launchAtLogin
         hotkeys.refreshSpotlightState()
+        guard !hotkeyOnly else {
+            return
+        }
         Task {
             let vaults = await Task.detached(priority: .userInitiated) { VaultDiscovery.vaults() }.value
             self.vaults = vaults
@@ -104,6 +112,8 @@ final class OnboardingModel {
 
     func next() {
         switch step {
+        case .hotkey where isHotkeyOnly:
+            onFinish?()
         case .hotkey:
             step = .destination
         case .destination:
@@ -147,6 +157,7 @@ final class OnboardingModel {
 
     func finish() {
         settings.launchAtLogin = launchAtLogin
+        LoginItem.setEnabled(launchAtLogin)
         settings.hasOnboarded = true
         deliveryTask?.cancel()
         deliveryTask = nil

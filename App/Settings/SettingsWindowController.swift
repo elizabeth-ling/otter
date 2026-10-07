@@ -58,6 +58,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         show()
     }
 
+    /// The menu bar's "Finish setting up ⌘Space…": onboarding's hotkey step on its own (T12). First-run
+    /// onboarding, if it's open, comes forward as it is.
+    func showHotkeySetup() {
+        if router.mode != .onboarding || window?.isVisible != true {
+            router.mode = .onboarding
+            onboarding.start(hotkeyOnly: true)
+        }
+        show()
+    }
+
     /// The toggle hotkey fired. Onboarding's hotkey step uses the press, so the panel doesn't open.
     /// - Returns: Whether the press was used here.
     func handleTogglePress() -> Bool {
@@ -82,7 +92,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func show() {
         let window = window ?? makeWindow()
-        window.title = router.mode == .onboarding ? "Welcome to Otter" : "Otter Settings"
+        window.title = switch router.mode {
+        case .onboarding: onboarding.isHotkeyOnly ? "Finish Setting Up ⌘Space" : "Welcome to Otter"
+        case .settings: "Otter Settings"
+        }
         model.window = window
         onboarding.window = window
         model.windowDidOpen()

@@ -229,13 +229,17 @@ Settings…                             ⌘,
 Quit Otter                              ⌘Q
 ```
 
-Clicking a recent item opens it where it lives: reveal in Finder (Folder) or `obsidian://open` (Obsidian). After v1, Apple Notes items activate Notes (T08).
+The menu is built each time it opens. The shortcut hints are the shortcuts in use: none is shown when a shortcut is unset. "Finish setting up ⌘Space…" opens onboarding's hotkey step on its own (§6, step 1), and its button closes the window.
+
+Clicking a recent item opens it where it lives: `obsidian://open` when the note is in a vault and Obsidian is installed, otherwise revealed in Finder. A note that has been moved or deleted since only beeps. A note with no text shows as "Untitled note"; the first line is cut to 40 characters. With no recent notes (or recents turned off) the submenu shows "No Recent Notes". After v1, Apple Notes items activate Notes (T08).
+
+The waiting row counts every note in the outbox; clicking it retries them all now, like Settings › Advanced › Retry Now. The amber dot appears after 5 failures in a row for one destination (ARCHITECTURE §4 rule 5), with one notification, "1 note couldn't be delivered to {destination}", that never includes note text; clicking it opens Settings › Advanced. The dot and notification go once the notes are delivered.
 
 ## 5. Settings (one window, three tabs)
 
 **General**
 - Open-panel hotkey · Save-clipboard hotkey
-- Launch at login
+- Launch at login: shows the login item as macOS has it. While macOS waits for approval, "Approve in System Settings › General › Login Items." with an **Open Login Items** button
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
 - Smart quotes and dashes (off by default — notes often contain code)

@@ -6,6 +6,10 @@ public struct DeliveryStatus: Sendable, Equatable {
     public var pendingCount: Int
     /// Destinations whose oldest pending capture failed its last attempt.
     public var failingDestinations: Set<DestinationID>
+    /// Destinations whose oldest pending capture has failed `DeliveryAlert.failureThreshold` times
+    /// or more, with how many captures wait for each: the menu bar's amber badge and the
+    /// notification (ARCHITECTURE §4 rule 5).
+    public var alertingDestinations: [DestinationID: Int] = [:]
     /// Destinations that pending captures point to but that can't be built (deleted, or no builder
     /// for the kind yet). Those captures wait for re-routing (T10).
     public var missingDestinations: Set<DestinationID>
@@ -188,7 +192,7 @@ public actor DeliveryService {
             }
         }
         scheduleWake(at: nextWake)
-        publishStatus(pending: pending.count, heads: heads)
+        publishStatus(pending: pending, heads: heads)
     }
 
     private func startLane(_ id: DestinationID) {
@@ -281,16 +285,22 @@ public actor DeliveryService {
 
     // MARK: - Status
 
-    private func publishStatus(pending: Int, heads: [DestinationID: OutboxItem]) {
+    private func publishStatus(pending: [OutboxItem], heads: [DestinationID: OutboxItem]) {
         let failingHeads = heads.values.filter { $0.attempts > 0 }
         if failingHeads.isEmpty {
             lastError = nil
         } else if lastError == nil {
             lastError = failingHeads.lazy.compactMap(\.lastError).first // Failures from before a relaunch.
         }
+        var alerting: [DestinationID: Int] = [:]
+        for head in failingHeads where DeliveryAlert.isAlerting(failures: head.attempts) {
+            let id = head.capture.destinationID
+            alerting[id] = pending.filter { $0.capture.destinationID == id }.count
+        }
         let updated = DeliveryStatus(
-            pendingCount: pending,
+            pendingCount: pending.count,
             failingDestinations: Set(failingHeads.map(\.capture.destinationID)),
+            alertingDestinations: alerting,
             missingDestinations: missing,
             lastError: lastError
         )

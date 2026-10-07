@@ -8,9 +8,11 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Step \(model.step.rawValue + 1) of \(OnboardingModel.Step.allCases.count)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if !model.isHotkeyOnly {
+                Text("Step \(model.step.rawValue + 1) of \(OnboardingModel.Step.allCases.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             switch model.step {
             case .hotkey:
                 HotkeyStep(model: model)
@@ -34,6 +36,10 @@ struct OnboardingView: View {
 
     @ViewBuilder private var primaryButtons: some View {
         switch model.step {
+        case .hotkey where model.isHotkeyOnly:
+            // `⌥Space` keeps working until `⌘Space` is free.
+            Button(model.hotkeyStatus.isConfirmed ? "Done" : "Not Now") { model.next() }
+                .keyboardShortcut(.defaultAction)
         case .hotkey:
             if model.hotkeyStatus.isConfirmed {
                 Button("Continue") { model.next() }

@@ -57,7 +57,8 @@ public struct AppSettings {
         nonmutating set { defaults.set(newValue, forKey: Key.smartQuotesAndDashes) }
     }
 
-    /// On by default (UX_SPEC §6). Registering the login item is T12's.
+    /// On by default (UX_SPEC §6). The user's last choice; the app's `LoginItem` registers it, and
+    /// Settings shows what macOS actually has.
     public var launchAtLogin: Bool {
         get { defaults.object(forKey: Key.launchAtLogin) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Key.launchAtLogin) }

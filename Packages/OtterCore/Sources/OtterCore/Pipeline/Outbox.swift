@@ -158,13 +158,16 @@ public actor Outbox {
     }
 
     /// Points every pending capture for `source` at `target`, e.g. the default destination when
-    /// `source` is deleted (ARCHITECTURE §4 rule 6). They're due at once. Returns how many moved.
+    /// `source` is deleted (ARCHITECTURE §4 rule 6). They're due at once, and failures against
+    /// `source` no longer count (rule 5 counts them per destination). Returns how many moved.
     @discardableResult
     public func reroute(from source: DestinationID, to target: DestinationID) throws -> Int {
         loadIfNeeded()
         var moved = 0
         for var item in items.values where item.capture.destinationID == source {
             item.capture.destinationID = target
+            item.attempts = 0
+            item.lastError = nil
             item.nextAttemptAt = nil
             items[item.capture.id] = item
             try write(item)

@@ -92,9 +92,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = settings
         settingsWindowController = settings
 
-        statusItemController = StatusItemController(recents: pipeline.recents, clipboardCapture: clipboardCapture) {
-            settings.showSettings()
+        let notifier = DeliveryNotifier { id in
+            destinations.config(for: id)?.name ?? "its destination"
+        } showDetails: {
+            settings.showSettings(tab: .advanced)
         }
+        statusItemController = StatusItemController(
+            hotkeys: hotkeys,
+            recents: pipeline.recents,
+            delivery: pipeline.delivery,
+            notifier: notifier,
+            actions: StatusItemController.Actions(
+                newNote: { panel.show() },
+                saveClipboard: { clipboardCapture.save() },
+                finishHotkeySetup: { settings.showHotkeySetup() },
+                openSettings: { settings.showSettings() }
+            )
+        )
 
         if !AppSettings().hasOnboarded {
             // After launch finishes, off the cold-launch path.
@@ -102,6 +116,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 settings.showOnboarding()
             }
         }
+    }
+
+    /// Otter.app opened again while it's running (Finder, Spotlight, Launchpad). An agent app has no
+    /// window to bring back, so Settings opens.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        settingsWindowController?.showSettings()
+        return false
     }
 
     /// Synchronous, so the draft is on disk before the process exits.

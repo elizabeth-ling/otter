@@ -55,6 +55,17 @@ struct GeneralSettingsView: View {
 
             Section("Panel") {
                 Toggle("Launch at login", isOn: $model.launchAtLogin)
+                if model.loginItemStatus == .requiresApproval {
+                    HStack {
+                        Text("Approve in System Settings › General › Login Items.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open Login Items") {
+                            LoginItem.openSystemSettings()
+                        }
+                    }
+                }
                 Toggle("Close panel when clicking elsewhere", isOn: Binding(
                     get: { !model.keepPanelOpen },
                     set: { model.keepPanelOpen = !$0 }

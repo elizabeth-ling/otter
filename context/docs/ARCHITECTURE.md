@@ -48,7 +48,8 @@ Otter/
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   │          ClipboardCapture.swift   # save-clipboard hotkey + menu item: pasteboard → staged files → outbox → HUD (T11)
 │   ├── HUD/HUDController.swift   # click-through pill near the bottom of the pointer's screen (T11)
-│   ├── MenuBar/StatusItemController.swift   # Save Clipboard, Settings…, Quit
+│   ├── MenuBar/StatusItemController.swift   # menu rebuilt on open (UX_SPEC §4): New Note, Save Clipboard, Recent ▸, waiting row, Settings…, Quit; amber badge (T12)
+│   │          DeliveryNotifier.swift   # one notification per failure burst, permission asked at the first failure (T12)
 │   │          FolderChooser.swift   # folder picker for a destination: panel header (T17), Settings, onboarding (T10)
 │   │          ObsidianLink+Open.swift   # open a note in Obsidian, or reveal it in Finder (T07)
 │   ├── Settings/SettingsWindowController.swift   # NSWindow hosting the SwiftUI tabs, or onboarding on first run (T10)
@@ -56,6 +57,7 @@ Otter/
 │   │           GeneralSettingsView.swift, DestinationsSettingsView.swift, DestinationForm.swift, AdvancedSettingsView.swift
 │   │           ShortcutViews.swift   # recorder warnings, ⌘Space handoff (shared with onboarding)
 │   │           LogExport.swift   # Reveal Logs: this run's log lines to logs/ (OSLogStore)
+│   │           LoginItem.swift   # launch at login: SMAppService.mainApp, registered only when the user chooses (T12)
 │   ├── Onboarding/OnboardingModel.swift, OnboardingView.swift   # first run: hotkey, destination, try it (T10)
 │   └── Resources/Info.plist, Assets.xcassets
 └── Packages/OtterCore/
@@ -63,7 +65,8 @@ Otter/
     │   ├── Model/Capture.swift, Attachment.swift, DestinationConfig.swift
     │   ├── Attachments/PasteRules.swift, AttachmentLimits.swift, AttachmentStager.swift   # what a paste becomes, limits + footer text, drafts/files/ (T09)
     │   ├── Pipeline/Outbox.swift, DeliveryService.swift, DeliveryClock.swift, RecentStore.swift, DraftStore.swift,
-    │   │            CaptureFailure.swift, StorageLocations.swift
+    │   │            CaptureFailure.swift, StorageLocations.swift,
+    │   │            DeliveryAlert.swift, RecentMenu.swift   # §4 rule 5 threshold and texts; Recent item titles (T12)
     │   ├── Destinations/Destination.swift, DestinationRegistry.swift, AttachmentEmbed.swift
     │   │                DestinationStatus.swift   # health dot level, actionable problems + fixes, mode summary, Test (T10)
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift,
@@ -164,7 +167,7 @@ sequenceDiagram
 2. Delivery is **at-least-once**. A duplicate can only occur if the process dies between the destination write and the outbox removal; that window is tiny and a duplicate is far better than a loss (ADR-005).
 3. `DeliveryService` is an actor with **one serial queue per destination**, so appends to the same file keep their order, and a slow Apple Notes call never blocks a folder write. A capture waiting on a retry holds back the later captures for its destination. Captures whose destination can't be built stay pending and are flagged in the service's status; there is no retry timer for them.
 4. On launch, on wake from sleep (`NSWorkspace.didWakeNotification`) and on any successful enqueue, the service drains pending items. There are no polling timers while the outbox is empty.
-5. After 5 consecutive failures for one destination: macOS notification + amber menu bar badge. Items are never auto-deleted.
+5. After 5 consecutive failures for one destination: macOS notification + amber menu bar badge. Items are never auto-deleted. The count is the attempts of the destination's oldest pending capture, which holds back the rest of its lane; re-routing starts it again. The badge stays while any destination is over the threshold; the notification is posted once when a destination crosses it and removed once its captures are delivered or moved (`DeliveryStatus.alertingDestinations`, `DeliveryAlert`).
 6. If a destination is deleted while items are pending for it, those items are offered for re-routing to the default destination (`Outbox.reroute`). Settings won't delete the last destination. "Retry now" makes every pending item due at once (`DeliveryService.retryNow`).
 
 ## 5. Destinations
@@ -277,7 +280,7 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 ## 10. Error handling and logging
 
-- `os.Logger(subsystem: "com.<you>.otter", category: …)` with categories `hotkey`, `panel`, `pipeline`, `folder`, `obsidian`, `notes`.
+- `os.Logger(subsystem: "com.<you>.otter", category: …)` with categories `app` (menu bar, notifications, login item), `hotkey`, `panel`, `pipeline`, `folder`, `obsidian`, `notes`.
 - **Never log note contents.** Log capture IDs, byte counts, destination IDs, and error codes only.
 - User-facing errors are short, specific and actionable ("Can't write to ‘Vault/Daily’ — folder is missing. Choose it again…").
 

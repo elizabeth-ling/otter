@@ -6,6 +6,8 @@ import os
 public extension Logger {
     static let subsystem = "com.yourname.otter"
 
+    /// The menu bar, notifications, the login item and other app lifecycle.
+    static let app = Logger(subsystem: subsystem, category: "app")
     static let hotkey = Logger(subsystem: subsystem, category: "hotkey")
     static let panel = Logger(subsystem: subsystem, category: "panel")
     static let pipeline = Logger(subsystem: subsystem, category: "pipeline")

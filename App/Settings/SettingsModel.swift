@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import OtterCore
 import os
+import ServiceManagement
 
 /// The Settings window's state (T10, UX_SPEC §5): Otter's preferences (`AppSettings`), the
 /// destinations (`DestinationRegistry`) and the outbox status. Every change applies straight away;
@@ -30,6 +31,7 @@ final class SettingsModel {
     @ObservationIgnored private let panel: PanelController
     @ObservationIgnored private var healthTask: Task<Void, Never>?
     @ObservationIgnored private var statusTask: Task<Void, Never>?
+    @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
 
     // MARK: General
 
@@ -58,9 +60,18 @@ final class SettingsModel {
         }
     }
 
-    /// Stored here; T12 registers the login item from it.
+    /// The login item as macOS has it (T12). Read when the window opens and whenever Otter comes
+    /// back to the front, e.g. from approving it in System Settings.
+    private(set) var loginItemStatus = SMAppService.Status.notRegistered
+
+    /// "Launch at login": on while Otter is a login item, including while macOS waits for approval.
+    /// A change adds or removes the login item straight away.
     var launchAtLogin: Bool {
-        didSet { settings.launchAtLogin = launchAtLogin }
+        get { LoginItem.isOn(loginItemStatus) }
+        set {
+            settings.launchAtLogin = newValue
+            loginItemStatus = LoginItem.setEnabled(newValue)
+        }
     }
 
     // MARK: Destinations
@@ -101,14 +112,26 @@ final class SettingsModel {
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
         smartQuotesAndDashes = settings.smartQuotesAndDashes
-        launchAtLogin = settings.launchAtLogin
         remembersRecents = settings.remembersRecents
         reloadDestinations()
     }
 
-    /// The window opened: subscribe to the outbox status and re-read Spotlight's shortcut.
+    /// The window opened: subscribe to the outbox status, and re-read Spotlight's shortcut and the
+    /// login item.
     func windowDidOpen() {
         hotkeys.refreshSpotlightState()
+        loginItemStatus = LoginItem.status
+        if activationObserver == nil {
+            activationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.loginItemStatus = LoginItem.status
+                }
+            }
+        }
         reloadDestinations()
         Task {
             discoveredVaults = await Task.detached(priority: .utility) { VaultDiscovery.vaults() }.value
@@ -126,6 +149,10 @@ final class SettingsModel {
     func windowWillClose() {
         statusTask?.cancel()
         statusTask = nil
+        if let activationObserver {
+            NotificationCenter.default.removeObserver(activationObserver)
+            self.activationObserver = nil
+        }
         healthTask?.cancel()
     }
 
@@ -348,8 +375,9 @@ final class SettingsModel {
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
         smartQuotesAndDashes = settings.smartQuotesAndDashes
-        launchAtLogin = settings.launchAtLogin
         remembersRecents = settings.remembersRecents
+        // The login item stays as it is; the stored preference follows it.
+        settings.launchAtLogin = launchAtLogin
         panel.resetPanelPosition()
         tests = [:]
         reloadDestinations()

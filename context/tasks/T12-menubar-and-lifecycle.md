@@ -16,8 +16,7 @@ A quiet, useful menu bar presence: start a note, see and reopen recent captures,
 1. `StatusItemController` builds the menu from UX_SPEC §4, rebuilt in `menuNeedsUpdate(_:)` (no polling). Shortcut hints mirror the user's configured hotkeys.
    While `HotkeyService.needsSpotlightHandoff` is true, show "Finish setting up ⌘Space…" (opens onboarding step 1).
 2. **Recent ▸** submenu from `RecentStore` (last 10): first line (truncated), destination, relative time. Click opens:
-   - `.file(URL)` → `NSWorkspace.shared.activateFileViewerSelecting([url])`
-   - `.obsidian` → `obsidian://open?…` (T07 helper)
+   - `.file(URL)` → `ObsidianLink.open(_:)` (T07): `obsidian://open?…` for a note in a vault, otherwise `NSWorkspace.shared.activateFileViewerSelecting([url])`. Vault notes are `.file` too; there's no `.obsidian` location.
    - `.appleNote` → nothing produces this until T08 (after v1). Handle the case so the `switch` is exhaustive, but don't build or test it; T08 wires opening Notes.
 3. Pending/failing state: icon variant with amber dot (`square.and.pencil` + badge, template-safe); menu row "N notes waiting to deliver… Retry"; one `UNUserNotification` per failure burst (request authorization lazily on first failure).
 4. Launch at login: `SMAppService.mainApp.register()` / `unregister()`; reflect `status` in Settings (handle `.requiresApproval` → show "Approve in System Settings › General › Login Items").
@@ -27,7 +26,7 @@ A quiet, useful menu bar presence: start a note, see and reopen recent captures,
 ## Implementation notes
 
 - Keep the status item image a template image so it adapts to light/dark and tinted menu bars.
-- Notification content must not include note text — "1 note couldn't be delivered to Daily note" only.
+- Notification content must not include note text — "1 note couldn't be delivered to Inbox" (the destination's name) only.
 
 ## Acceptance criteria
 

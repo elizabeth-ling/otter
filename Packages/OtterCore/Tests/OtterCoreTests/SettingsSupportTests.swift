@@ -203,7 +203,9 @@ func rerouteMovesOnlyTheDeletedDestinationsCapturesAndSurvivesARelaunch() async 
     let reloaded = await Outbox(directory: root).pending()
     #expect(reloaded.map(\.capture.destinationID) == [target, other, target])
     #expect(reloaded.allSatisfy { $0.nextAttemptAt == nil })
-    #expect(reloaded.first?.attempts == 1)
+    // Failures against the deleted destination don't count towards the new one's alert (§4 rule 5).
+    #expect(reloaded.first?.attempts == 0)
+    #expect(reloaded.first?.lastError == nil)
 }
 
 @Test(.timeLimit(.minutes(1)))
