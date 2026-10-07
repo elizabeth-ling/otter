@@ -30,6 +30,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let recents: RecentStore
     private let delivery: DeliveryService
     private let notifier: DeliveryNotifier
+    private let updates: UpdateController
     private let actions: Actions
 
     private var status = DeliveryStatus.idle
@@ -38,11 +39,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var statusTask: Task<Void, Never>?
     private var deliveriesTask: Task<Void, Never>?
 
-    init(hotkeys: HotkeyService, recents: RecentStore, delivery: DeliveryService, notifier: DeliveryNotifier, actions: Actions) {
+    init(hotkeys: HotkeyService, recents: RecentStore, delivery: DeliveryService, notifier: DeliveryNotifier, updates: UpdateController, actions: Actions) {
         self.hotkeys = hotkeys
         self.recents = recents
         self.delivery = delivery
         self.notifier = notifier
+        self.updates = updates
         self.actions = actions
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
@@ -98,6 +100,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
 
         addItem("Settings…", #selector(openSettings(_:)), key: ",", to: menu)
+        let checkForUpdates = addItem(updates.hasUnseenUpdate ? "Update Available…" : "Check for Updates…", #selector(checkForUpdates(_:)), to: menu)
+        if !updates.canCheckForUpdates {
+            // No action, so the menu disables it: a check is already running, or updates are off.
+            checkForUpdates.action = nil
+        }
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
@@ -124,6 +131,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func openSettings(_ sender: Any?) {
         actions.openSettings()
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        updates.checkForUpdates()
     }
 
     /// Opens the note where it lives: in Obsidian if it's in a vault, otherwise in Finder.

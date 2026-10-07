@@ -20,7 +20,7 @@ These are the tie-breakers for every decision.
 2. **It must feel instant.** Hotkey to typing in under 100 ms, every time. Saving never makes you wait — the panel closes the moment you hit `⌘↩`; delivery happens in the background.
 3. **Never lose a note.** Every keystroke is drafted to disk; every submitted note is journaled before the panel closes; failed deliveries retry until they succeed.
 4. **Your notes, your system.** Otter writes plain Markdown files (and, after v1, real Apple Notes). Uninstalling Otter leaves nothing stranded.
-5. **Free, local, private.** No account, no telemetry, no network calls. Ever, in v1.
+5. **Free, local, private.** No account, no telemetry, no network calls besides the update check, which can be turned off (ADR-009).
 6. **Return focus.** Closing the panel must leave you exactly where you were, with the previous app still focused and typeable.
 
 ## 4. Who it's for
@@ -104,12 +104,12 @@ Point a folder destination at your Obsidian vault after M0 and you're already do
 | Obsidian config formats change (daily notes, Periodic Notes plugin) | Medium | Parse defensively; fall back to defaults; let the user override folder/format manually |
 | Non-activating panel focus edge cases (full-screen, Stage Manager, IME) | Medium | Dedicated test matrix in T14 |
 | iCloud Drive vault not downloaded / offline | Low | Coordinated writes; outbox retries; surface the error |
-| Notarization requires a paid Apple Developer account ($99/yr) | Certain | Decide before T13 (see open questions) |
+| Notarization requires a paid Apple Developer account ($99/yr) | Certain | Decided: Developer ID and notarization (open question 2) |
 
 ## 10. Open questions
 
-1. ~~Name~~ **Decided: Otter.** Note: Otter.ai is an established note-taking/transcription product. Before T13, check the Mac App Store, GitHub and USPTO for conflicts, and consider a distinguishing full name for the listing and bundle ID (e.g. "Otter Quick Notes") if needed.
-2. **Apple Developer Program.** Needed for a Gatekeeper-friendly free download. Pay the $99/yr, or ship unsigned with "right-click → Open" instructions?
-3. **Open source?** Recommended (MIT) — builds trust for an app that writes into people's vaults, and invites destination contributions.
+1. ~~Name~~ **Decided: Otter**, bundle ID `io.github.elizabeth-ling.otter` (T13, ADR-019). Otter.ai is an established note-taking/transcription product; the name was kept without a trademark search, and a Homebrew token other than `otter` may be needed for `homebrew/cask`.
+2. ~~Apple Developer Program~~ **Decided:** Developer ID–signed and notarized (T13).
+3. ~~Open source?~~ **Decided:** MIT, public repo (T13).
 4. **Default destination when nothing is configured.** Proposal: `~/Documents/Otter Inbox/` folder, so the app works the second it's installed.
 5. **Append format.** Timestamp heading (`## 22:07`) vs bullet (`- 22:07 text`) for daily-note appends. Proposal: bullet for single-line notes, heading block for multi-line, configurable template.

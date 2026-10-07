@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyService: HotkeyService?
     private var panelController: PanelController?
     private var settingsWindowController: SettingsWindowController?
+    private var updateController: UpdateController?
 
     // Keep this minimal: it sits on the cold-launch path (ARCHITECTURE §9).
     // Later tasks register services here; anything slow must be deferred.
@@ -84,9 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.start()
         hotkeyService = hotkeys
 
+        // Cheap: Sparkle reads its defaults and schedules the next check; nothing goes over the
+        // network here.
+        let updates = UpdateController()
+        updateController = updates
+
         // The window itself is built on first show.
         let settings = SettingsWindowController(
-            model: SettingsModel(pipeline: pipeline, hotkeys: hotkeys, folderChooser: folderChooser, panel: panel),
+            model: SettingsModel(pipeline: pipeline, hotkeys: hotkeys, folderChooser: folderChooser, panel: panel, updates: updates),
             onboarding: OnboardingModel(hotkeys: hotkeys, folderChooser: folderChooser, delivery: pipeline.delivery)
         )
         settingsWindow = settings
@@ -102,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             recents: pipeline.recents,
             delivery: pipeline.delivery,
             notifier: notifier,
+            updates: updates,
             actions: StatusItemController.Actions(
                 newNote: { panel.show() },
                 saveClipboard: { clipboardCapture.save() },

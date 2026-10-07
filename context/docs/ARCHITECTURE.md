@@ -2,7 +2,7 @@
 
 ## 1. Shape of the system
 
-One process. A native Swift menu-bar agent (`LSUIElement = YES`) with no server, no helper daemons, and no network access. Two modules:
+One process. A native Swift menu-bar agent (`LSUIElement = YES`) with no server and no helper daemons. Its only network access is Sparkle's update check, which the user can turn off (ADR-009). Two modules:
 
 - **OtterCore** (local Swift package, Foundation only, no AppKit/SwiftUI): models, outbox, delivery, Markdown/HTML formatting, destination writers, Obsidian config parsing. Fully unit-testable on the command line.
 - **Otter** (app target, AppKit + SwiftUI): hotkeys, floating panel, editor, menu bar, settings, onboarding, HUD.
@@ -48,7 +48,7 @@ Otter/
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   │          ClipboardCapture.swift   # save-clipboard hotkey + menu item: pasteboard → staged files → outbox → HUD (T11)
 │   ├── HUD/HUDController.swift   # click-through pill near the bottom of the pointer's screen (T11)
-│   ├── MenuBar/StatusItemController.swift   # menu rebuilt on open (UX_SPEC §4): New Note, Save Clipboard, Recent ▸, waiting row, Settings…, Quit; amber badge (T12)
+│   ├── MenuBar/StatusItemController.swift   # menu rebuilt on open (UX_SPEC §4): New Note, Save Clipboard, Recent ▸, waiting row, Settings…, Check for Updates…, Quit; amber badge (T12, T13)
 │   │          DeliveryNotifier.swift   # one notification per failure burst, permission asked at the first failure (T12)
 │   │          FolderChooser.swift   # folder picker for a destination: panel header (T17), Settings, onboarding (T10)
 │   │          ObsidianLink+Open.swift   # open a note in Obsidian, or reveal it in Finder (T07)
@@ -58,6 +58,7 @@ Otter/
 │   │           ShortcutViews.swift   # recorder warnings, ⌘Space handoff (shared with onboarding)
 │   │           LogExport.swift   # Reveal Logs: this run's log lines to logs/ (OSLogStore)
 │   │           LoginItem.swift   # launch at login: SMAppService.mainApp, registered only when the user chooses (T12)
+│   ├── Updates/UpdateController.swift   # Sparkle 2: daily check, "Check for Updates…", gentle reminders; off in Debug builds (T13)
 │   ├── Onboarding/OnboardingModel.swift, OnboardingView.swift   # first run: hotkey, destination, try it (T10)
 │   └── Resources/Info.plist, Assets.xcassets
 └── Packages/OtterCore/
@@ -87,6 +88,10 @@ Otter/
     │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core
     │               Signposts.swift   # os_signpost intervals (§9)
     └── Tests/OtterCoreTests/
+├── scripts/release.sh, cask.sh   # signed + notarized DMG, appcast, release notes; Homebrew cask (T13, ADR-019)
+├── .github/workflows/ci.yml, release.yml   # tests + build on every push; a `v*` tag publishes a release (T13)
+├── CHANGELOG.md                  # one section per version: GitHub release notes and Sparkle's update notes
+└── LICENSE                       # MIT
 ```
 
 ## 3. Core model
@@ -264,7 +269,7 @@ recent.json                  # last 20 receipts (first line, destination, locati
 logs/                        # os.Logger is primary; Settings › Advanced › Reveal Logs exports this run's lines here
 ```
 
-Settings in `UserDefaults` (suite `com.<you>.otter`). Nothing is stored anywhere else.
+Settings in `UserDefaults` (domain `io.github.elizabeth-ling.otter`), including Sparkle's `SU…` keys. Nothing is stored anywhere else.
 
 ## 9. Performance budget
 
@@ -280,7 +285,7 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 ## 10. Error handling and logging
 
-- `os.Logger(subsystem: "com.<you>.otter", category: …)` with categories `app` (menu bar, notifications, login item), `hotkey`, `panel`, `pipeline`, `folder`, `obsidian`, `notes`.
+- `os.Logger(subsystem: "io.github.elizabeth-ling.otter", category: …)` with categories `app` (menu bar, notifications, login item), `hotkey`, `panel`, `pipeline`, `folder`, `obsidian`, `notes`.
 - **Never log note contents.** Log capture IDs, byte counts, destination IDs, and error codes only.
 - User-facing errors are short, specific and actionable ("Can't write to ‘Vault/Daily’ — folder is missing. Choose it again…").
 

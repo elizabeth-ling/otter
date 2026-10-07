@@ -223,3 +223,19 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - A click on a circle toggles it on any line, since it's drawn on the caret line too.
 
 **Consequences.** Revealing a task's marker can re-wrap its first line. The gutter is gone, so items sit as close to plain text as in Obsidian. ADR-017's other rules (keys, nesting, paste, undo, display-only) stand.
+
+---
+
+## ADR-019 · Releases come from a `v*` tag; GitHub hosts the DMG and the appcast; the build number is the commit count
+
+**Context.** ADR-004 settles how Otter is distributed (Developer ID, notarized DMG, Sparkle, Homebrew). T13 has to choose where the update feed lives, how versions are numbered, and how much of a release is manual. The product owner decided OVERVIEW §10's open questions 1–3: the name stays Otter, the bundle ID is `io.github.elizabeth-ling.otter`, and the code is MIT-licensed in a public repo.
+
+**Decision.**
+- **Tag to release.** Pushing `vX.Y.Z` runs `.github/workflows/release.yml`. It calls `scripts/release.sh X.Y.Z`, which archives, exports with Developer ID, notarizes and staples the app, builds the DMG, then signs, notarizes and staples it, checks both with `codesign` and `spctl`, and writes the appcast. The workflow then publishes the GitHub release and commits the new cask to `elizabeth-ling/homebrew-tap`. Nothing is uploaded or edited by hand. The same script runs locally with `--local` (ad-hoc signed, not notarized) to test it and to test updates.
+- **Versions.** The tag sets `CFBundleShortVersionString` (SemVer, digits only). `CFBundleVersion`, which Sparkle compares, is `git rev-list --count HEAD`. It only goes up as long as releases are tagged on `main`'s history, and nobody has to bump it. The project file keeps `0.1.0` / `1` for Debug builds.
+- **Feed.** `SUFeedURL` is `…/releases/latest/download/appcast.xml`. Each release uploads an appcast holding only itself; Sparkle needs only the newest item. There are no GitHub Pages and no deltas.
+- **Release notes** are the version's `## [X.Y.Z]` section of `CHANGELOG.md`. It becomes both the GitHub release body and the Markdown notes Sparkle shows. A tag without a section fails before anything is built.
+- **Secrets** live only in GitHub Actions: the Developer ID certificate (.p12 and password), the App Store Connect API key, Sparkle's EdDSA private key and a token for the tap repo. The public EdDSA key is in the project file (`SPARKLE_PUBLIC_ED_KEY`).
+- **Updates in the app.** A daily check (on by default, Settings › Advanced) uses Sparkle's gentle reminders: an agent app must not bring a window up over the user's work, so the menu bar item changes to "Update Available…". Debug builds don't start the updater.
+
+**Consequences.** A release needs a clean `main` and a changelog entry, and nothing else. Changing the bundle ID reset the `UserDefaults` of existing development installs (shortcuts, settings, destinations); `~/Library/Application Support/Otter/` is keyed by name, so drafts and the outbox stayed. Rebasing `main` after a release could lower the commit count; don't. A prerelease channel would need Sparkle channels and a different feed; it's not needed for v1.

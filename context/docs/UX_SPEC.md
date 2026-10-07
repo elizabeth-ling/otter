@@ -226,12 +226,15 @@ Recent                                  ▸   (last 10: first line · destinatio
 2 notes waiting to deliver… Retry           (only when non-zero)
 ──────────────────────────────────────────
 Settings…                             ⌘,
+Check for Updates…                          ("Update Available…" once a daily check has found one)
 Quit Otter                              ⌘Q
 ```
 
 The menu is built each time it opens. The shortcut hints are the shortcuts in use: none is shown when a shortcut is unset. "Finish setting up ⌘Space…" opens onboarding's hotkey step on its own (§6, step 1), and its button closes the window.
 
 Clicking a recent item opens it where it lives: `obsidian://open` when the note is in a vault and Obsidian is installed, otherwise revealed in Finder. A note that has been moved or deleted since only beeps. A note with no text shows as "Untitled note"; the first line is cut to 40 characters. With no recent notes (or recents turned off) the submenu shows "No Recent Notes". After v1, Apple Notes items activate Notes (T08).
+
+"Check for Updates…" opens Sparkle's window (the update, "You're up to date", or the error); it's disabled while a check runs. A daily check never brings a window up over the user's work: the item changes to "Update Available…" and the window opens when the user picks it. Sparkle shows its window straight away only if Otter is already in front.
 
 The waiting row counts every note in the outbox; clicking it retries them all now, like Settings › Advanced › Retry Now. The amber dot appears after 5 failures in a row for one destination (ARCHITECTURE §4 rule 5), with one notification, "1 note couldn't be delivered to {destination}", that never includes note text; clicking it opens Settings › Advanced. The dot and notification go once the notes are delivered.
 
@@ -253,7 +256,8 @@ The waiting row counts every note in the outbox; clicking it retries them all no
 **Advanced**
 - Outbox: pending count, last error, Retry now, Reveal outbox folder
 - Remember recent captures (on/off) · Clear recents
-- Reveal logs (saves this run's log, which never holds note text, to `logs/` and shows it in Finder) · Reset all settings (after a confirmation: preferences, shortcuts, panel position and destinations go back to a fresh install's; waiting notes go to the Otter Inbox; onboarding isn't shown again)
+- Updates: Automatically check for updates (on by default; "Once a day Otter asks GitHub whether there's a newer version. This is Otter's only network access, and it sends nothing but Otter's version number.") · Check Now
+- Reveal logs (saves this run's log, which never holds note text, to `logs/` and shows it in Finder) · Reset all settings (after a confirmation: preferences, shortcuts, panel position, destinations and the update check go back to a fresh install's; waiting notes go to the Otter Inbox; onboarding isn't shown again)
 
 Every setting applies as it changes; there's no Save button. A destination with notes waiting can be deleted only after confirming they move to the default; the last destination can't be deleted. Health dots: green working, amber needs access, red folder missing; checked when the tab appears and after edits. A failed Test says what's wrong and offers the fix ("Choose Folder…" for a missing folder, "Grant Access…" to re-pick one Otter can't write to). `⌘W` closes the window.
 

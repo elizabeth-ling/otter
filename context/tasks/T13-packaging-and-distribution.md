@@ -42,7 +42,7 @@ A stranger can download a DMG (or `brew install --cask`), open it without Gateke
 - [ ] On a clean Mac (or fresh user account), download DMG → drag to Applications → open: no Gatekeeper warning.
 - [ ] `spctl` and `codesign --verify --deep --strict` pass on app and DMG.
 - [ ] v0.1.0 → v0.1.1 auto-update via Sparkle works and keeps settings, outbox and drafts.
-- [ ] `brew install --cask yourname/tap/otter` works.
+- [ ] `brew install --cask elizabeth-ling/tap/otter` works.
 - [ ] Tagging `v*` produces a complete release with no manual steps.
 
 ## Out of scope
