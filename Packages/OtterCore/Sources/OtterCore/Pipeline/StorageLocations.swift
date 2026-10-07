@@ -28,4 +28,9 @@ public enum StorageLocations {
     public static var recents: URL {
         root.appendingPathComponent("recent.json")
     }
+
+    /// Logs exported from Settings › Advanced › Reveal Logs. `os.Logger` is the real log (§10).
+    public static var logs: URL {
+        root.appendingPathComponent("logs", isDirectory: true)
+    }
 }

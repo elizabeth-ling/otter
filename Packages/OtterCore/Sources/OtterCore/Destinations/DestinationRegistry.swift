@@ -140,6 +140,15 @@ public final class DestinationRegistry: Sendable {
         }
     }
 
+    /// "Reset all settings": `config` becomes the only destination, and the default.
+    public func reset(to config: DestinationConfig) {
+        mutate { state in
+            state.configs = [config]
+            state.defaultID = config.id
+            state.built = [:]
+        }
+    }
+
     public func setDefault(_ id: DestinationID) {
         mutate { state in
             guard state.configs.contains(where: { $0.id == id }) else {

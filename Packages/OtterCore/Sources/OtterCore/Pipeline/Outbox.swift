@@ -7,7 +7,8 @@ public struct OutboxItem: Codable, Sendable, Equatable {
     /// Failed delivery attempts so far.
     public var attempts: Int
     public var lastError: String?
-    /// When the next attempt may start. `nil` means it hasn't been tried yet and is due now.
+    /// When the next attempt may start. `nil` means it's due now: it hasn't been tried yet, or the
+    /// user asked to retry (`makeAllDue`) or re-routed it (`reroute`).
     public var nextAttemptAt: Date?
     /// Enqueue order. It breaks ties between captures with the same `createdAt`, because dates are
     /// stored to the second.
@@ -154,6 +155,33 @@ public actor Outbox {
         item.nextAttemptAt = nextAttemptAt
         items[id] = item
         try write(item)
+    }
+
+    /// Points every pending capture for `source` at `target`, e.g. the default destination when
+    /// `source` is deleted (ARCHITECTURE §4 rule 6). They're due at once. Returns how many moved.
+    @discardableResult
+    public func reroute(from source: DestinationID, to target: DestinationID) throws -> Int {
+        loadIfNeeded()
+        var moved = 0
+        for var item in items.values where item.capture.destinationID == source {
+            item.capture.destinationID = target
+            item.nextAttemptAt = nil
+            items[item.capture.id] = item
+            try write(item)
+            moved += 1
+        }
+        return moved
+    }
+
+    /// "Retry now": every pending capture is due at once, whatever its backoff. Its attempts so far
+    /// are kept.
+    public func makeAllDue() throws {
+        loadIfNeeded()
+        for var item in items.values where item.nextAttemptAt != nil {
+            item.nextAttemptAt = nil
+            items[item.capture.id] = item
+            try write(item)
+        }
     }
 
     // MARK: - Private

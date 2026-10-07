@@ -119,6 +119,18 @@ final class HotkeyService {
         return validation
     }
 
+    /// "Reset all settings": both shortcuts back to their defaults (`⌥Space`, none). `clearDefaults`
+    /// wipes the stored preferences, shortcuts included; it runs once every chord is unregistered,
+    /// since the library unregisters a shortcut by reading it back from `UserDefaults`.
+    func resetShortcuts(clearingDefaults clearDefaults: () -> Void) {
+        KeyboardShortcuts.reset(.togglePanel, .saveClipboard)
+        KeyboardShortcuts.setShortcut(nil, for: .effectiveTogglePanel)
+        clearDefaults()
+        KeyboardShortcuts.reset(.togglePanel, .saveClipboard)
+        applyRegistration(force: true)
+        Logger.hotkey.info("Shortcuts reset to their defaults")
+    }
+
     /// Opens System Settings › Keyboard, where Keyboard Shortcuts › Spotlight lives.
     func openSpotlightShortcutSettings() {
         let workspace = NSWorkspace.shared

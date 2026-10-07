@@ -38,10 +38,9 @@ Otter/
 │   ├── OtterApp.swift            # @main, NSApplicationDelegateAdaptor
 │   ├── AppDelegate.swift         # wiring, lifecycle
 │   ├── Hotkeys/HotkeyService.swift, SpotlightShortcutProbe.swift
-│   │          HotkeyWindowController.swift   # temporary recorder window until T10
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)
-│   ├── Panel/DestinationPill.swift   # header dot + name; a folder's name opens the folder picker (T17)
+│   ├── Panel/DestinationPill.swift   # header dot + name; a click opens the destination menu (⌘1…⌘9, "Change Folder…") (T10, T17)
 │   ├── Panel/EditorView.swift    # NSTextView wrapper + key handling; caret, delete and copy around hidden markers (ADR-016); draws bullets and checkboxes, list keys (T18)
 │   ├── Panel/MarkdownStyler.swift   # text storage delegate: MarkdownStyling spans and list items → display-only style, indent and hiding attributes (ADR-016, ADR-017)
 │   ├── Panel/SaveAsPrompt.swift  # ⌘S: native Save panel, centred on the screen (T16)
@@ -49,11 +48,15 @@ Otter/
 │   ├── Capture/CapturePipeline.swift, CaptureService.swift   # builds the pipeline; submit → outbox (T05)
 │   │          ClipboardCapture.swift   # save-clipboard hotkey + menu item: pasteboard → staged files → outbox → HUD (T11)
 │   ├── HUD/HUDController.swift   # click-through pill near the bottom of the pointer's screen (T11)
-│   ├── MenuBar/StatusItemController.swift, FolderChooser.swift   # "Choose Folder…" until T10; also opened from the panel header (T17)
-│   │          ObsidianVaultMenu.swift   # "Use Obsidian Vault ▸" until T10 (T07)
+│   ├── MenuBar/StatusItemController.swift   # Save Clipboard, Settings…, Quit
+│   │          FolderChooser.swift   # folder picker for a destination: panel header (T17), Settings, onboarding (T10)
 │   │          ObsidianLink+Open.swift   # open a note in Obsidian, or reveal it in Finder (T07)
-│   ├── Settings/…                # SwiftUI views
-│   ├── Onboarding/…
+│   ├── Settings/SettingsWindowController.swift   # NSWindow hosting the SwiftUI tabs, or onboarding on first run (T10)
+│   │           SettingsModel.swift   # @Observable: AppSettings + DestinationRegistry + outbox status; changes apply live
+│   │           GeneralSettingsView.swift, DestinationsSettingsView.swift, DestinationForm.swift, AdvancedSettingsView.swift
+│   │           ShortcutViews.swift   # recorder warnings, ⌘Space handoff (shared with onboarding)
+│   │           LogExport.swift   # Reveal Logs: this run's log lines to logs/ (OSLogStore)
+│   ├── Onboarding/OnboardingModel.swift, OnboardingView.swift   # first run: hotkey, destination, try it (T10)
 │   └── Resources/Info.plist, Assets.xcassets
 └── Packages/OtterCore/
     ├── Sources/OtterCore/
@@ -62,6 +65,7 @@ Otter/
     │   ├── Pipeline/Outbox.swift, DeliveryService.swift, DeliveryClock.swift, RecentStore.swift, DraftStore.swift,
     │   │            CaptureFailure.swift, StorageLocations.swift
     │   ├── Destinations/Destination.swift, DestinationRegistry.swift, AttachmentEmbed.swift
+    │   │                DestinationStatus.swift   # health dot level, actionable problems + fixes, mode summary, Test (T10)
     │   ├── Destinations/Folder/FolderDestination.swift, MarkdownWriter.swift, FileNamer.swift,
 │   │                       FolderBookmark.swift, FolderRegistration.swift   # builder, default inbox (T06)
     │   ├── Destinations/Obsidian/ObsidianVault.swift, ObsidianVaultSettings.swift,   # vault lookup, app.json (T07)
@@ -75,6 +79,8 @@ Otter/
     │   ├── Clipboard/ClipboardSave.swift, HUDPlacement.swift   # what the clipboard holds, HUD messages, "Already saved" window, HUD frame (T11)
     │   ├── Hotkeys/HotkeyCombo.swift, SpotlightShortcutState.swift, EffectiveToggleHotkey.swift,
     │   │           PanelToggleAction.swift, ShortcutValidation.swift   # pure hotkey rules (T02)
+    │   │           OnboardingHotkeyStatus.swift   # onboarding step 1: press to confirm, wait for Spotlight (T10)
+    │   ├── Settings/AppSettings.swift   # UserDefaults-backed preferences, Reset all (T10)
     │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core
     │               Signposts.swift   # os_signpost intervals (§9)
     └── Tests/OtterCoreTests/
@@ -159,7 +165,7 @@ sequenceDiagram
 3. `DeliveryService` is an actor with **one serial queue per destination**, so appends to the same file keep their order, and a slow Apple Notes call never blocks a folder write. A capture waiting on a retry holds back the later captures for its destination. Captures whose destination can't be built stay pending and are flagged in the service's status; there is no retry timer for them.
 4. On launch, on wake from sleep (`NSWorkspace.didWakeNotification`) and on any successful enqueue, the service drains pending items. There are no polling timers while the outbox is empty.
 5. After 5 consecutive failures for one destination: macOS notification + amber menu bar badge. Items are never auto-deleted.
-6. If a destination is deleted while items are pending for it, those items are offered for re-routing to the default destination.
+6. If a destination is deleted while items are pending for it, those items are offered for re-routing to the default destination (`Outbox.reroute`). Settings won't delete the last destination. "Retry now" makes every pending item due at once (`DeliveryService.retryNow`).
 
 ## 5. Destinations
 
@@ -252,7 +258,7 @@ drafts/files/                # its attachments, as <attachment-id>.<ext>, until 
 outbox/<capture-id>.json     # pending capture + delivery attempts + last error
 outbox/<capture-id>/files/   # attachment payloads until delivered
 recent.json                  # last 20 receipts (first line, destination, location, time) — opt-out
-logs/                        # os.Logger is primary; this only holds exported diagnostics
+logs/                        # os.Logger is primary; Settings › Advanced › Reveal Logs exports this run's lines here
 ```
 
 Settings in `UserDefaults` (suite `com.<you>.otter`). Nothing is stored anywhere else.

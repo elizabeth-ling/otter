@@ -6,25 +6,17 @@ import OtterCore
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
-    private let hotkeyWindowController: HotkeyWindowController
-    private let panelController: PanelController
-    private let folderChooser: FolderChooser?
-    private let vaultMenu: ObsidianVaultMenu?
     private let recents: RecentStore?
     private let clipboardCapture: ClipboardCapture?
+    private let openSettings: @MainActor () -> Void
 
     init(
-        hotkeyWindowController: HotkeyWindowController,
-        panelController: PanelController,
-        folderChooser: FolderChooser?,
         recents: RecentStore?,
-        clipboardCapture: ClipboardCapture?
+        clipboardCapture: ClipboardCapture?,
+        openSettings: @escaping @MainActor () -> Void
     ) {
-        self.hotkeyWindowController = hotkeyWindowController
-        self.panelController = panelController
-        self.folderChooser = folderChooser
-        vaultMenu = folderChooser.map(ObsidianVaultMenu.init(folderChooser:))
         self.recents = recents
+        self.openSettings = openSettings
         self.clipboardCapture = clipboardCapture
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
@@ -39,15 +31,6 @@ final class StatusItemController {
             saveClipboardItem.target = self
             menu.addItem(.separator())
         }
-        // Until destination settings land (T10).
-        if let folderChooser {
-            let folderItem = menu.addItem(withTitle: "Choose Folder…", action: #selector(FolderChooser.chooseFolder(_:)), keyEquivalent: "")
-            folderItem.target = folderChooser
-        }
-        if let vaultMenu {
-            let vaultItem = menu.addItem(withTitle: "Use Obsidian Vault", action: nil, keyEquivalent: "")
-            vaultItem.submenu = vaultMenu.menu
-        }
         #if DEBUG
         // Until the Recent menu lands (T12): checks `ObsidianLink.open` by hand (T07).
         if recents != nil {
@@ -55,15 +38,15 @@ final class StatusItemController {
             openItem.target = self
         }
         #endif
-        // Temporary until Settings lands (T10).
-        let hotkeyItem = menu.addItem(withTitle: "Hotkey…", action: #selector(NSWindowController.showWindow(_:)), keyEquivalent: "")
-        hotkeyItem.target = hotkeyWindowController
-        // Moves to Settings › General with T10.
-        let resetItem = menu.addItem(withTitle: "Reset Panel Position", action: #selector(PanelController.resetPanelPosition(_:)), keyEquivalent: "")
-        resetItem.target = panelController
+        let settingsItem = menu.addItem(withTitle: "Settings…", action: #selector(showSettings(_:)), keyEquivalent: ",")
+        settingsItem.target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Otter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
+    }
+
+    @objc private func showSettings(_ sender: Any?) {
+        openSettings()
     }
 
     /// The same path as the save-clipboard hotkey (T11).

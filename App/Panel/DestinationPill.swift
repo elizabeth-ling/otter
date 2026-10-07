@@ -1,12 +1,12 @@
 import AppKit
 
-/// The header's destination (UX_SPEC §1): the colored dot and the destination's name. For a folder
-/// destination it's a button that opens the folder picker (T17). It takes every mouse-down in its
-/// bounds, so the label never swallows one: a press that turns into a drag moves the window, which
-/// keeps the header a drag handle.
+/// The header's destination (UX_SPEC §1): the colored dot and the destination's name. It's a
+/// button that opens the destination menu (T10), which ends with "Change Folder…" for a folder (T17).
+/// It takes every mouse-down in its bounds, so the label never swallows one: a press that turns into
+/// a drag moves the window, which keeps the header a drag handle.
 final class DestinationPill: NSView {
-    /// A click or VoiceOver's press. Only called while the destination is a folder.
-    var onChooseFolder: (() -> Void)? {
+    /// A click or VoiceOver's press: show the destination menu below the pill.
+    var onClick: ((NSView) -> Void)? {
         didSet { update() }
     }
 
@@ -24,7 +24,7 @@ final class DestinationPill: NSView {
         didSet { needsDisplay = true }
     }
 
-    private var isClickable: Bool { folderPath != nil && onChooseFolder != nil }
+    private var isClickable: Bool { onClick != nil }
 
     init() {
         super.init(frame: .zero)
@@ -62,6 +62,7 @@ final class DestinationPill: NSView {
     }
 
     /// `folderPath` is the full path for the tooltip, or `nil` when the destination isn't a folder.
+    /// The pressed look stays while the menu is open.
     func set(name: String, folderPath: String?) {
         label.stringValue = name
         self.folderPath = folderPath
@@ -111,7 +112,7 @@ final class DestinationPill: NSView {
         isHovered = false
     }
 
-    /// A click opens the folder picker on mouse-up inside; a drag moves the window and opens nothing.
+    /// A click opens the menu on mouse-up inside; a drag moves the window and opens nothing.
     override func mouseDown(with event: NSEvent) {
         guard let window else {
             return
@@ -127,7 +128,7 @@ final class DestinationPill: NSView {
             let location = next.locationInWindow
             if next.type == .leftMouseUp {
                 if bounds.contains(convert(location, from: nil)) {
-                    onChooseFolder?()
+                    onClick?(self)
                 }
                 return
             }
@@ -145,18 +146,18 @@ final class DestinationPill: NSView {
         guard isClickable else {
             return false
         }
-        onChooseFolder?()
+        onClick?(self)
         return true
     }
 
     // MARK: - Private
 
     private func update() {
-        toolTip = isClickable ? folderPath : nil
+        toolTip = folderPath
         if isClickable {
-            setAccessibilityRole(.button)
-            setAccessibilityLabel("Save location: \(label.stringValue)")
-            setAccessibilityHelp("Change folder")
+            setAccessibilityRole(.menuButton)
+            setAccessibilityLabel("Destination: \(label.stringValue)")
+            setAccessibilityHelp("Choose where this note goes")
         } else {
             setAccessibilityRole(.staticText)
             setAccessibilityLabel("Destination: \(label.stringValue)")

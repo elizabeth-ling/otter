@@ -14,6 +14,14 @@ public struct DeliveryStatus: Sendable, Equatable {
     public static let idle = DeliveryStatus(pendingCount: 0, failingDestinations: [], missingDestinations: [], lastError: nil)
 }
 
+/// One capture a destination accepted, for onboarding's "Try it" step (T10).
+public struct Delivery: Sendable, Equatable {
+    public var captureID: UUID
+    public var destinationID: DestinationID
+    public var destinationName: String
+    public var receipt: DeliveryReceipt
+}
+
 /// How long to wait after a failed attempt: 2 s, 10 s, 60 s, then every 5 minutes.
 public enum RetryPolicy {
     public static func delay(afterFailures failures: Int) -> TimeInterval {
@@ -58,6 +66,7 @@ public actor DeliveryService {
     private var wakeGeneration = 0
     private var lastError: String?
     private var statusObservers: [UUID: AsyncStream<DeliveryStatus>.Continuation] = [:]
+    private var deliveryObservers: [UUID: AsyncStream<Delivery>.Continuation] = [:]
 
     public private(set) var status = DeliveryStatus.idle
 
@@ -93,6 +102,27 @@ public actor DeliveryService {
         }
         continuation.yield(status)
         return stream
+    }
+
+    /// Every delivery from now on.
+    public func deliveries() -> AsyncStream<Delivery> {
+        let (stream, continuation) = AsyncStream.makeStream(of: Delivery.self)
+        let id = UUID()
+        deliveryObservers[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeDeliveryObserver(id) }
+        }
+        return stream
+    }
+
+    /// "Retry now" in Settings: tries every pending capture straight away, ignoring its backoff.
+    public func retryNow() async {
+        do {
+            try await outbox.makeAllDue()
+        } catch {
+            Logger.pipeline.error("Couldn't reset the retry times: \(error.loggableCode, privacy: .public)")
+        }
+        await kick()
     }
 
     /// Waits until no pass or lane is running. A retry that is sleeping doesn't count. For tests.
@@ -194,6 +224,10 @@ public actor DeliveryService {
             }
             Logger.pipeline.info("Delivered \(captureID, privacy: .public) to \(id, privacy: .public) after \(head.attempts + 1, privacy: .public) attempt(s)")
             await recents?.record(head.capture, receipt: receipt, destinationName: destination.displayName)
+            let delivery = Delivery(captureID: captureID, destinationID: id, destinationName: destination.displayName, receipt: receipt)
+            for observer in deliveryObservers.values {
+                observer.yield(delivery)
+            }
         }
         lanes[id] = nil
         requestDrain(retryMissing: false)
@@ -271,5 +305,9 @@ public actor DeliveryService {
 
     private func removeStatusObserver(_ id: UUID) {
         statusObservers[id] = nil
+    }
+
+    private func removeDeliveryObserver(_ id: UUID) {
+        deliveryObservers[id] = nil
     }
 }

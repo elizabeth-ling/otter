@@ -69,6 +69,24 @@ public extension DestinationRegistry {
         return config.id
     }
 
+    /// "Change Folder…" for one folder destination (the panel's destination menu, Settings): points
+    /// it at `bookmark`'s folder, keeping its ID and settings so captures waiting for it follow. Its
+    /// name follows the folder unless the user gave it one of their own. Does nothing for another kind.
+    func setFolder(_ id: DestinationID, bookmark: Data, displayPath: String) {
+        modify(id) { config in
+            guard case var .folder(options) = config.options else {
+                return
+            }
+            if config.name == (options.displayPath as NSString).lastPathComponent {
+                config.name = (displayPath as NSString).lastPathComponent
+            }
+            options.bookmark = bookmark
+            options.displayPath = displayPath
+            options.fallbackPath = nil
+            config.options = .folder(options)
+        }
+    }
+
     /// Saves a folder's re-created bookmark, leaving the rest of its settings alone. A name that's
     /// still the folder's old name follows a rename; one the user chose stays.
     func updateFolderBookmark(_ id: DestinationID, bookmark: Data, displayPath: String) {

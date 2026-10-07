@@ -55,7 +55,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | Size | Opens at 380 × 300 pt. Resizable both ways (min 300 × 180, max 720 × 640, capped to the screen); size remembered |
 | Height | Fixed at the user's size; text scrolls inside. The panel doesn't grow as you type |
 | Corner radius | 12 pt |
-| Position | Screen containing the mouse pointer. Wherever the user last dragged it on that display (remembered per display, across relaunches); otherwise horizontally centered with the top edge at ~22% of the visible frame. Always kept fully on-screen. Menu bar "Reset Panel Position" restores the default |
+| Position | Screen containing the mouse pointer. Wherever the user last dragged it on that display (remembered per display, across relaunches); otherwise horizontally centered with the top edge at ~22% of the visible frame. Always kept fully on-screen. Settings › General › "Reset panel position and size" restores the default |
 | Background | Vibrancy (`NSVisualEffectView`, `.popover`/`.hudWindow` material), thin 0.5 pt separator-color border, system shadow |
 | Stacking | Floats above all normal app windows, including full-screen apps, on whichever Space you're on |
 | Font | System font, 15 pt (setting: system / monospaced, size) |
@@ -65,7 +65,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 
 ### Footer
 
-- **Destination pill** (in the header): colored dot + destination name. For a folder destination the name is the folder's name, its tooltip is the full path, and it highlights on hover. Clicking it (or `⇧⌘O`) opens a folder picker over the panel; the folder chosen becomes where notes are saved from then on, and the text being typed stays as it is (T17). `⌘1…⌘9` switches destination for *this note only*; the default comes back on the next open.
+- **Destination pill** (in the header): colored dot + destination name. For a folder destination the name is the folder's name, its tooltip is the full path, and it highlights on hover. Clicking it opens the destination menu (T10): every destination with its `⌘1…⌘9` number, the shown one ticked, and for a folder, "Change Folder… ⇧⌘O" last. Choosing a destination, or pressing `⌘1…⌘9`, switches it for *this note only*; the default comes back on the next open and after a save. "Change Folder…" (or `⇧⌘O`) opens a folder picker over the panel for the destination shown; the folder chosen becomes where that destination saves from then on, and the text being typed stays as it is (T17). The destination's name follows the folder unless it was renamed in Settings.
 - **Attachment chips** (above the footer, T09): one per pasted or dropped file or image: a thumbnail for images or the file type's icon, the name ("Pasted image" for clipboard image data) and size, and `✕` to remove it. The row scrolls sideways when full and is hidden when empty. Up to 10 per note; a file over 200 MB is refused, one over 25 MB is kept with a warning.
 - **Hint** (right): `⌘↩ Save · ⌘S Save as…`. Turns into an orange inline warning when relevant: why a paste wasn't attached (too many, too large, a folder), until the next edit; when the destination can't take attachments ("{Destination} can't take attachments — they'll be dropped." once T08 adds Apple Notes); or when an attachment is over 25 MB.
 - **Pending badge**: if the outbox has failed deliveries, a small amber dot with count appears next to the destination pill. Click → menu with Retry / Show details.
@@ -249,17 +249,19 @@ Clicking a recent item opens it where it lives: reveal in Finder (Folder) or `ob
 **Advanced**
 - Outbox: pending count, last error, Retry now, Reveal outbox folder
 - Remember recent captures (on/off) · Clear recents
-- Reveal logs · Reset all settings
+- Reveal logs (saves this run's log, which never holds note text, to `logs/` and shows it in Finder) · Reset all settings (after a confirmation: preferences, shortcuts, panel position and destinations go back to a fresh install's; waiting notes go to the Otter Inbox; onboarding isn't shown again)
+
+Every setting applies as it changes; there's no Save button. A destination with notes waiting can be deleted only after confirming they move to the default; the last destination can't be deleted. Health dots: green working, amber needs access, red folder missing; checked when the tab appears and after edits. A failed Test says what's wrong and offers the fix ("Choose Folder…" for a missing folder, "Grant Access…" to re-pick one Otter can't write to). `⌘W` closes the window.
 
 ## 6. First run
 
 Shown once, in the Settings window, three steps:
 
 1. **Your hotkey.** Recommended: `⌥Space`, already active. "Use ⌘Space instead" starts the Spotlight handoff: if Spotlight still owns `⌘Space`, the step explains this in one sentence and shows an **Open Keyboard Shortcuts** button (System Settings › Keyboard › Keyboard Shortcuts › Spotlight) with "Uncheck *Show Spotlight search*, or change it to ⌥Space." The step re-checks when Otter regains focus and turns green once `⌘Space` is free; then it asks the user to press `⌘Space` once to confirm. "Use a different shortcut" opens the recorder; "Skip for now" keeps `⌥Space`. Either way, the step asks the user to press the shortcut once to confirm it reaches Otter (`⌥Space` may be taken by another app).
-2. **Where should notes go?** Detected Obsidian vaults listed first, then "A folder…". One choice; sensible defaults for the rest (a vault or folder → new file per note, ADR-013). After v1, T08 adds Apple Notes between the two ("Otter" folder in the default account), and picking it runs a test right away so the Automation prompt appears now, not mid-capture.
+2. **Where should notes go?** Detected Obsidian vaults listed first (the one opened most recently pre-selected), then the Otter Inbox in Documents, then "A folder…". One choice; sensible defaults for the rest (a vault or folder → new file per note, ADR-013). After v1, T08 adds Apple Notes between the two ("Otter" folder in the default account), and picking it runs a test right away so the Automation prompt appears now, not mid-capture.
 3. **Try it.** "Press ⌥Space, type anything, hit ⌘↩." (shows whichever hotkey step 1 ended on) The step completes itself when the first capture is delivered and shows where it went, with an "Open" button.
 
-Launch at login is offered on the last step (default on).
+Launch at login is offered on the last step (default on). In step 1 a press of the toggle shortcut confirms it rather than opening the panel; from step 3 it opens the panel. Closing the window counts as done.
 
 ## 7. Accessibility
 

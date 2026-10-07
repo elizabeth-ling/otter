@@ -63,8 +63,8 @@ public actor FolderDestination: Destination {
         self.onBookmarkChange = onBookmarkChange
     }
 
-    /// The folder exists, is a directory and is writable. The default inbox only needs a writable
-    /// parent, since it's created on the first save.
+    /// The folder exists, is a directory and is writable; one Otter can't write to needs permission.
+    /// The default inbox only needs a writable parent, since it's created on the first save.
     public func healthCheck() async -> DestinationHealth {
         let missing = DestinationHealth.unreachable(FolderDestinationError.folderMissing.localizedDescription)
         guard let folder = try? locateFolder(creatingIfNeeded: false) else {
@@ -78,7 +78,7 @@ public actor FolderDestination: Destination {
             return missing
         }
         guard FileManager.default.isWritableFile(atPath: target.path) else {
-            return .unreachable("Folder isn't writable")
+            return .needsPermission
         }
         return .ok
     }

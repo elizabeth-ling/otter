@@ -28,7 +28,7 @@ final class CapturePipeline {
         registryReference.registry = destinations
         destinations.addDefaultInboxIfEmpty()
         let outbox = Outbox(directory: StorageLocations.outbox)
-        let recents = RecentStore(fileURL: StorageLocations.recents)
+        let recents = RecentStore(fileURL: StorageLocations.recents, isEnabled: AppSettings().remembersRecents)
         let delivery = DeliveryService(
             outbox: outbox,
             destinations: { destinations.destination(for: $0) },

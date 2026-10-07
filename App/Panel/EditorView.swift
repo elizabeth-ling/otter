@@ -61,6 +61,15 @@ final class EditorView: NSScrollView {
         }
     }
 
+    /// "Smart quotes and dashes" (UX_SPEC §5). Off by default: notes often contain code.
+    var smartQuotesAndDashes: Bool {
+        get { textView.isAutomaticQuoteSubstitutionEnabled }
+        set {
+            textView.isAutomaticQuoteSubstitutionEnabled = newValue
+            textView.isAutomaticDashSubstitutionEnabled = newValue
+        }
+    }
+
     private let styler: MarkdownStyler
 
     init(font: NSFont, inset: CGFloat, placeholder: String) {
@@ -80,7 +89,7 @@ final class EditorView: NSScrollView {
         textView.importsGraphics = false
         textView.allowsUndo = true
         textView.isContinuousSpellCheckingEnabled = true
-        // Off by default; a setting can turn them on later.
+        // Off unless the setting turns them on (`smartQuotesAndDashes`).
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false

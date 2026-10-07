@@ -19,9 +19,7 @@
 		0A0000000000000000000601 /* Exceptions for "App" folder in "Otter" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Onboarding/.gitkeep,
 				Resources/Info.plist,
-				Settings/.gitkeep,
 			);
 			target = 0A0000000000000000000701 /* Otter */;
 		};

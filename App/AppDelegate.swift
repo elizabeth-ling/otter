@@ -22,62 +22,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
     private var hotkeyService: HotkeyService?
     private var panelController: PanelController?
+    private var settingsWindowController: SettingsWindowController?
 
     // Keep this minimal: it sits on the cold-launch path (ARCHITECTURE §9).
     // Later tasks register services here; anything slow must be deferred.
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard let pipeline = capturePipeline else {
+            return
+        }
         // Built once here and only ordered in and out (ARCHITECTURE §6).
-        let destinations = capturePipeline?.destinations
-        let captureService = capturePipeline?.captureService
-        let folderChooser = capturePipeline.map { FolderChooser(destinations: $0.destinations, delivery: $0.delivery) }
+        let destinations = pipeline.destinations
+        let captureService = pipeline.captureService
+        let folderChooser = FolderChooser(destinations: destinations, delivery: pipeline.delivery)
+        // Set below; the panel's `⌘,` and the menu bar open it.
+        var settingsWindow: SettingsWindowController?
         // One stager for `drafts/files/`, shared with the clipboard hotkey, so the panel's launch sweep
         // never removes a file the hotkey staged this session.
         let attachmentStager = AttachmentStager(directory: StorageLocations.draftFiles)
         let panel = PanelController(
             draftStore: DraftStore(fileURL: StorageLocations.draft),
             attachmentStager: attachmentStager
-        ) {
-            guard let config = destinations?.defaultID.flatMap({ destinations?.config(for: $0) }) else {
+        ) { id in
+            // A destination deleted in Settings since it was picked falls back to the default.
+            guard let config = id.flatMap(destinations.config(for:)) ?? destinations.defaultID.flatMap(destinations.config(for:)) else {
                 return PanelDestination(name: "No destination")
             }
-            return PanelDestination(name: config.name, folderPath: config.folderDisplayPath, supportsAttachments: config.kind.supportsAttachments)
-        } refreshDestination: {
+            return PanelDestination(config)
+        } destinationChoices: {
+            destinations.configs.map(PanelDestination.init)
+        } refreshDestination: { id in
             // A folder destination re-bookmarks a renamed folder here, which updates its name.
-            guard let destination = destinations?.defaultID.flatMap({ destinations?.destination(for: $0) }) else {
+            guard let destination = (id ?? destinations.defaultID).flatMap(destinations.destination(for:)) else {
                 return
             }
             _ = await destination.healthCheck()
-        } submit: { text, file, attachments in
-            await captureService?.submit(text: text, saveAs: file, attachments: attachments) ?? false
-        } chooseFolder: { window in
-            await folderChooser?.chooseFolder(above: window) ?? false
-        } chooseSaveFile: { window, defaultName in
-            await SaveAsPrompt.chooseFile(above: window, in: folderChooser?.currentFolder(), defaultName: defaultName)
+        } submit: { text, file, attachments, id in
+            await captureService.submit(text: text, saveAs: file, attachments: attachments, destinationID: id)
+        } chooseFolder: { window, id in
+            await folderChooser.chooseFolder(for: id, presentation: .window(above: window))
+        } chooseSaveFile: { window, defaultName, id in
+            await SaveAsPrompt.chooseFile(above: window, in: folderChooser.currentFolder(for: id), defaultName: defaultName)
+        } openSettings: {
+            settingsWindow?.showSettings()
         }
         panelController = panel
 
         // The HUD's panel is built on its first message, not here.
-        let clipboardCapture = capturePipeline.map {
-            ClipboardCapture(captureService: $0.captureService, destinations: $0.destinations, stager: attachmentStager, hud: HUDController())
-        }
+        let clipboardCapture = ClipboardCapture(captureService: captureService, destinations: destinations, stager: attachmentStager, hud: HUDController())
 
         let hotkeys = HotkeyService()
         hotkeys.onTogglePanel = {
+            // Onboarding's first step asks for a press to check the shortcut reaches Otter.
+            if settingsWindow?.handleTogglePress() == true {
+                return
+            }
             panel.toggle()
         }
         hotkeys.onSaveClipboard = {
-            clipboardCapture?.save()
+            clipboardCapture.save()
         }
         hotkeys.start()
         hotkeyService = hotkeys
 
-        statusItemController = StatusItemController(
-            hotkeyWindowController: HotkeyWindowController(hotkeys: hotkeys),
-            panelController: panel,
-            folderChooser: folderChooser,
-            recents: capturePipeline?.recents,
-            clipboardCapture: clipboardCapture
+        // The window itself is built on first show.
+        let settings = SettingsWindowController(
+            model: SettingsModel(pipeline: pipeline, hotkeys: hotkeys, folderChooser: folderChooser, panel: panel),
+            onboarding: OnboardingModel(hotkeys: hotkeys, folderChooser: folderChooser, delivery: pipeline.delivery)
         )
+        settingsWindow = settings
+        settingsWindowController = settings
+
+        statusItemController = StatusItemController(recents: pipeline.recents, clipboardCapture: clipboardCapture) {
+            settings.showSettings()
+        }
+
+        if !AppSettings().hasOnboarded {
+            // After launch finishes, off the cold-launch path.
+            DispatchQueue.main.async {
+                settings.showOnboarding()
+            }
+        }
     }
 
     /// Synchronous, so the draft is on disk before the process exits.

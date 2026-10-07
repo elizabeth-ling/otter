@@ -36,6 +36,6 @@ final class ObsidianVaultMenu: NSObject, NSMenuDelegate {
         guard let root = sender.representedObject as? URL else {
             return
         }
-        folderChooser.use(root)
+        folderChooser.use(root, for: nil)
     }
 }

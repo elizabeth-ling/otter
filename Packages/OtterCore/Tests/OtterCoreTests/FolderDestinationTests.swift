@@ -352,7 +352,7 @@ func fiftyCapturesThroughTheDeliveryLaneAppendInOrder() async throws {
     let destination = try makeDestination(folder: folder)
     try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
 
-    #expect(await destination.healthCheck() == .unreachable("Folder isn't writable"))
+    #expect(await destination.healthCheck() == .needsPermission)
     await #expect(throws: (any Error).self) {
         try await destination.deliver(makeCapture(destination: destination.id), files: noFiles)
     }

@@ -21,10 +21,10 @@ final class PanelContentView: NSVisualEffectView {
     /// Zero while there are no attachments, so the editor takes the room.
     private lazy var chipsHeight = attachmentChips.heightAnchor.constraint(equalToConstant: 0)
 
-    /// Clicking a folder destination's name in the header (T17).
-    var onChooseFolder: (() -> Void)? {
-        get { destinationPill.onChooseFolder }
-        set { destinationPill.onChooseFolder = newValue }
+    /// Clicking the destination in the header: show the destination menu below it (T10).
+    var onDestinationClick: ((NSView) -> Void)? {
+        get { destinationPill.onClick }
+        set { destinationPill.onClick = newValue }
     }
 
     init() {
@@ -81,7 +81,7 @@ final class PanelContentView: NSVisualEffectView {
     }
 
     /// Call before showing: the default destination may have changed since last time. `folderPath`
-    /// is `nil` unless it's a folder destination, whose name then opens the folder picker.
+    /// is `nil` unless it's a folder destination; it's the pill's tooltip.
     func setDestination(name: String, folderPath: String?) {
         destinationPill.set(name: name, folderPath: folderPath)
     }
@@ -131,7 +131,7 @@ final class PanelContentView: NSVisualEffectView {
     }
 
     /// The drag handle: a plain view, so a mouse-down on it moves the window. No separator below.
-    /// The destination pill moves it too, unless the press is a click on a folder's name.
+    /// The destination pill moves it too, unless the press is a click on it.
     private func makeHeader() -> NSView {
         let header = NSView()
         header.translatesAutoresizingMaskIntoConstraints = false

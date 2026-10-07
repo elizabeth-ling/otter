@@ -14,22 +14,25 @@ import os
 final class PanelController: NSObject, NSWindowDelegate {
     static let fadeDuration: TimeInterval = 0.08
 
-    /// "Keep panel open when clicking elsewhere". Hard-coded until Settings (T10).
-    private let keepOpenWhenClickingElsewhere = false
-
     private let panel: CapturePanel
     private let content = PanelContentView()
     private let frameStore: PanelFrameStore
+    private let settings: AppSettings
     private let draftStore: DraftStore
     private let stager: AttachmentStager
-    private let destination: @MainActor () -> PanelDestination
-    private let refreshDestination: @MainActor () async -> Void
-    private let submitNote: @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment]) async -> Bool
-    private let pickFolder: (@MainActor (_ above: NSWindow) async -> Bool)?
-    private let pickSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)?
+    private let destination: @MainActor (DestinationID?) -> PanelDestination
+    private let destinationChoices: @MainActor () -> [PanelDestination]
+    private let refreshDestination: @MainActor (DestinationID?) async -> Void
+    private let submitNote: @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment], _ destination: DestinationID?) async -> Bool
+    private let pickFolder: (@MainActor (_ above: NSWindow, _ destination: DestinationID) async -> Bool)?
+    private let pickSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String, _ destination: DestinationID?) async -> URL?)?
+    private let openSettings: (@MainActor () -> Void)?
 
     /// What the header shows now.
     private var shownDestination: PanelDestination?
+    /// The destination chosen for this note with `⌘1…⌘9` or the header's menu. `nil` is the default,
+    /// which comes back on the next show and after a save.
+    private var noteDestinationID: DestinationID?
     /// The note's attachments, staged in `drafts/files/`, in the order they were added.
     private var attachments: [StagedAttachment] = []
     /// Attachments still being copied in; they count towards the limit already.
@@ -63,33 +66,42 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var isShown: Bool { panel.isVisible && !isHiding }
 
     /// - Parameters:
-    ///   - destination: The destination the header shows.
-    ///   - refreshDestination: Checks the default destination, so a renamed folder's new name is
-    ///     saved before `destination` is read again.
+    ///   - destination: The destination with an ID, or the default for `nil` or an ID that's gone.
+    ///   - destinationChoices: Every destination, in `⌘1…⌘9` order, for the header's menu.
+    ///   - refreshDestination: Checks a destination (`nil` for the default), so a renamed folder's new
+    ///     name is saved before `destination` is read again.
     ///   - attachmentStager: Keeps pasted and dropped files in `drafts/files/` until the note is submitted.
-    ///   - submit: Puts the note and its attachments in the outbox, to be written to the file chosen
-    ///     in the Save panel if there is one. Returns `true` once it's safe there.
-    ///   - chooseFolder: Shows the folder picker above the panel. Returns `true` if the folder changed.
-    ///   - chooseSaveFile: Shows the Save panel above the panel, offering `defaultName`.
-    ///     Returns the file chosen, or `nil` for Cancel.
+    ///   - submit: Puts the note and its attachments in the outbox for a destination (`nil` for the
+    ///     default), to be written to the file chosen in the Save panel if there is one. Returns
+    ///     `true` once it's safe there.
+    ///   - chooseFolder: Shows the folder picker above the panel for a folder destination. Returns
+    ///     `true` if the folder changed.
+    ///   - chooseSaveFile: Shows the Save panel above the panel, offering `defaultName` in the
+    ///     destination's folder. Returns the file chosen, or `nil` for Cancel.
+    ///   - openSettings: `⌘,`.
     init(
         defaults: UserDefaults = .standard,
         draftStore: DraftStore,
         attachmentStager: AttachmentStager,
-        destination: @escaping @MainActor () -> PanelDestination,
-        refreshDestination: @escaping @MainActor () async -> Void = {},
-        submit: @escaping @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment]) async -> Bool,
-        chooseFolder: (@MainActor (_ above: NSWindow) async -> Bool)? = nil,
-        chooseSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String) async -> URL?)? = nil
+        destination: @escaping @MainActor (DestinationID?) -> PanelDestination,
+        destinationChoices: @escaping @MainActor () -> [PanelDestination] = { [] },
+        refreshDestination: @escaping @MainActor (DestinationID?) async -> Void = { _ in },
+        submit: @escaping @MainActor (_ text: String, _ file: URL?, _ attachments: [StagedAttachment], _ destination: DestinationID?) async -> Bool,
+        chooseFolder: (@MainActor (_ above: NSWindow, _ destination: DestinationID) async -> Bool)? = nil,
+        chooseSaveFile: (@MainActor (_ above: NSWindow, _ defaultName: String, _ destination: DestinationID?) async -> URL?)? = nil,
+        openSettings: (@MainActor () -> Void)? = nil
     ) {
         frameStore = PanelFrameStore(defaults: defaults)
+        settings = AppSettings(defaults: defaults)
         self.draftStore = draftStore
         stager = attachmentStager
         self.destination = destination
+        self.destinationChoices = destinationChoices
         self.refreshDestination = refreshDestination
         submitNote = submit
         pickFolder = chooseFolder
         pickSaveFile = chooseSaveFile
+        self.openSettings = openSettings
         panel = CapturePanel(contentRect: NSRect(origin: .zero, size: PanelPlacement.defaultSize))
         super.init()
 
@@ -102,9 +114,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         content.editor.onTextChange = { [weak self] in self?.saveDraft() }
         content.editor.onAttach = { [weak self] pasted in self?.attach(pasted) }
         content.attachmentChips.onRemove = { [weak self] attachment in self?.removeAttachments([attachment]) }
-        if chooseFolder != nil {
-            content.onChooseFolder = { [weak self] in self?.chooseFolder() }
-        }
+        content.onDestinationClick = { [weak self] pill in self?.showDestinationMenu(below: pill) }
+        applyEditorSettings()
 
         spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
@@ -153,12 +164,16 @@ final class PanelController: NSObject, NSWindowDelegate {
         fadeGeneration += 1
         let wasHiding = isHiding
         isHiding = false
+        if !wasHiding {
+            // A destination picked for the last note doesn't carry over.
+            noteDestinationID = nil
+        }
 
         updateDestination()
         // The folder may have been renamed in Finder since; checking it is disk work, so it's done
         // off the show path and the name updated after.
-        Task {
-            await refreshDestination()
+        Task { [noteDestinationID] in
+            await refreshDestination(noteDestinationID)
             updateDestination()
         }
         if !didRestoreDraft {
@@ -216,13 +231,26 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Menu bar "Reset Panel Position" (T10 moves it to Settings › General): default size and
-    /// placement on every display from the next show.
-    @objc func resetPanelPosition(_ sender: Any?) {
+    /// Settings › General › "Reset panel position and size": default size and placement on every
+    /// display from the next show.
+    func resetPanelPosition() {
         frameStore.reset()
         if isShown, let screen = panel.screen {
             place(on: screen)
         }
+    }
+
+    /// The Font and "Smart quotes and dashes" settings, read now. Settings calls this on a change.
+    func applyEditorSettings() {
+        let size = CGFloat(settings.fontSize)
+        let font: NSFont = switch settings.fontFamily {
+        case .system: .systemFont(ofSize: size)
+        case .monospaced: .monospacedSystemFont(ofSize: size, weight: .regular)
+        }
+        if content.editor.font != font {
+            content.editor.font = font
+        }
+        content.editor.smartQuotesAndDashes = settings.smartQuotesAndDashes
     }
 
     /// Writes the draft to disk before the app quits.
@@ -243,7 +271,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Clicking elsewhere closes the panel. Switching Spaces doesn't, although it also takes key.
     func windowDidResignKey(_ notification: Notification) {
         // Not shown: an `Esc` or hotkey hide is ordering it out.
-        guard !keepOpenWhenClickingElsewhere, isShown, !isShowingDialog else {
+        guard !settings.keepPanelOpenWhenClickingElsewhere, isShown, !isShowingDialog else {
             return
         }
         let now = ProcessInfo.processInfo.systemUptime
@@ -404,9 +432,13 @@ final class PanelController: NSObject, NSWindowDelegate {
             content.editor.discardText()
             removeAttachments(attachments.map(\.attachment))
         case let .selectDestination(index):
-            Logger.panel.info("Destination \(index + 1, privacy: .public) chosen; destinations are picked here from T10")
+            selectDestination(at: index)
         case .openSettings:
-            Logger.panel.info("Settings requested; they arrive with T10")
+            guard let openSettings else {
+                NSSound.beep()
+                return
+            }
+            openSettings()
         case .chooseFolder:
             chooseFolder()
         case .saveAs:
@@ -415,20 +447,68 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private func updateDestination() {
-        let destination = destination()
+        let destination = destination(noteDestinationID)
         shownDestination = destination
         content.setDestination(name: destination.name, folderPath: destination.folderPath)
         updateFooter()
     }
 
-    /// The header's folder name or `⇧⌘O` (T17).
+    /// `⌘1…⌘9`, in Settings' order: this note goes there. Beeps past the last destination.
+    private func selectDestination(at index: Int) {
+        let choices = destinationChoices()
+        guard choices.indices.contains(index), let id = choices[index].id else {
+            NSSound.beep()
+            return
+        }
+        noteDestinationID = id
+        updateDestination()
+    }
+
+    /// The header's menu: every destination with its `⌘` number, the shown one ticked, then
+    /// "Change Folder…" for a folder (T17).
+    private func showDestinationMenu(below view: NSView) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for (index, choice) in destinationChoices().enumerated() {
+            let item = menu.addItem(withTitle: choice.name, action: #selector(destinationMenuItemChosen(_:)), keyEquivalent: index < 9 ? "\(index + 1)" : "")
+            item.keyEquivalentModifierMask = .command
+            item.target = self
+            item.tag = index
+            item.state = choice.id == shownDestination?.id ? .on : .off
+            item.toolTip = choice.folderPath
+        }
+        if pickFolder != nil, shownDestination?.folderPath != nil {
+            if !menu.items.isEmpty {
+                menu.addItem(.separator())
+            }
+            let item = menu.addItem(withTitle: "Change Folder…", action: #selector(changeFolderMenuItemChosen(_:)), keyEquivalent: "o")
+            item.keyEquivalentModifierMask = [.command, .shift]
+            item.target = self
+        }
+        guard !menu.items.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        // The menu's top-left corner, just under the pill.
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.isFlipped ? view.bounds.maxY + 4 : -4), in: view)
+    }
+
+    @objc private func destinationMenuItemChosen(_ sender: NSMenuItem) {
+        selectDestination(at: sender.tag)
+    }
+
+    @objc private func changeFolderMenuItemChosen(_ sender: NSMenuItem) {
+        chooseFolder()
+    }
+
+    /// "Change Folder…" in the header's menu, or `⇧⌘O` (T17), for the destination shown.
     private func chooseFolder() {
-        guard let pickFolder, isShown, shownDestination?.folderPath != nil else {
+        guard let pickFolder, isShown, shownDestination?.folderPath != nil, let id = shownDestination?.id else {
             NSSound.beep()
             return
         }
         showDialog { [self] in
-            if await pickFolder(panel) {
+            if await pickFolder(panel, id) {
                 updateDestination()
             }
         }
@@ -442,8 +522,9 @@ final class PanelController: NSObject, NSWindowDelegate {
             return
         }
         let defaultName = FileNamer.defaultTitle(for: Date(), in: .current)
+        let destinationID = shownDestination?.id
         showDialog { [self] in
-            if let file = await pickSaveFile(panel, defaultName) {
+            if let file = await pickSaveFile(panel, defaultName, destinationID) {
                 submit(closeAfter: false, saveAs: file)
             }
         }
@@ -488,6 +569,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
         let text = content.editor.text
         let submitted = attachments
+        let destinationID = noteDestinationID
         guard !isNoteEmpty else {
             if closeAfter {
                 hide()
@@ -497,10 +579,15 @@ final class PanelController: NSObject, NSWindowDelegate {
 
         isSubmitting = true
         Task {
-            let saved = await submitNote(text, file, submitted)
+            let saved = await submitNote(text, file, submitted, destinationID)
             isSubmitting = false
             guard saved else {
                 return
+            }
+            // The next note goes to the default again.
+            if noteDestinationID == destinationID {
+                noteDestinationID = nil
+                updateDestination()
             }
             // The outbox has taken the attachments' files. Text typed, and files attached, while the
             // note was being saved stay, rather than being lost with it.
@@ -570,8 +657,21 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 }
 
-/// The destination shown in the panel header.
+/// The destination shown in the panel header, or one in its menu.
 struct PanelDestination {
+    init(id: DestinationID? = nil, name: String, folderPath: String? = nil, supportsAttachments: Bool = true) {
+        self.id = id
+        self.name = name
+        self.folderPath = folderPath
+        self.supportsAttachments = supportsAttachments
+    }
+
+    init(_ config: DestinationConfig) {
+        self.init(id: config.id, name: config.name, folderPath: config.folderDisplayPath, supportsAttachments: config.kind.supportsAttachments)
+    }
+
+    /// `nil` when nothing is configured.
+    var id: DestinationID?
     var name: String
     /// The full path, for a folder destination; its name then opens the folder picker (T17).
     var folderPath: String?
