@@ -34,7 +34,7 @@ Replace the temporary menu items with a real Settings window, and get a new user
 
 ## Acceptance criteria
 
-- [ ] Fresh install (`defaults delete com.yourname.otter`, remove App Support dir) → onboarding → first note delivered in < 60 s.
+- [ ] Fresh install (`defaults delete io.github.elizabeth-ling.otter`, remove App Support dir) → onboarding → first note delivered in < 60 s.
 - [ ] Every setting persists across relaunch and applies without restart.
 - [ ] Test button surfaces each error state with a working fix action (folder missing, folder access denied).
 - [ ] `⌘1…⌘9` in the panel matches the order shown in Settings.

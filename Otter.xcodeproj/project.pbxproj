@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0A0000000000000000000101 /* OtterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000301 /* OtterCore */; };
 		0A0000000000000000000102 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000302 /* KeyboardShortcuts */; };
+		0A0000000000000000000103 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000303 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 			files = (
 				0A0000000000000000000101 /* OtterCore in Frameworks */,
 				0A0000000000000000000102 /* KeyboardShortcuts in Frameworks */,
+				0A0000000000000000000103 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,6 +89,7 @@
 			packageProductDependencies = (
 				0A0000000000000000000301 /* OtterCore */,
 				0A0000000000000000000302 /* KeyboardShortcuts */,
+				0A0000000000000000000303 /* Sparkle */,
 			);
 			productName = Otter;
 			productReference = 0A0000000000000000000201 /* Otter.app */;
@@ -119,6 +122,7 @@
 			packageReferences = (
 				0A0000000000000000000901 /* XCLocalSwiftPackageReference "Packages/OtterCore" */,
 				0A0000000000000000000902 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				0A0000000000000000000903 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0A0000000000000000000402 /* Products */;
@@ -224,8 +228,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.otter;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.elizabeth-ling.otter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SPARKLE_PUBLIC_ED_KEY = "";
 			};
 			name = Debug;
 		};
@@ -246,8 +251,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.otter;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.elizabeth-ling.otter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SPARKLE_PUBLIC_ED_KEY = "";
 			};
 			name = Release;
 		};
@@ -290,6 +296,14 @@
 				minimumVersion = 1.10.0;
 			};
 		};
+		0A0000000000000000000903 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -301,6 +315,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0A0000000000000000000902 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
 			productName = KeyboardShortcuts;
+		};
+		0A0000000000000000000303 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000903 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

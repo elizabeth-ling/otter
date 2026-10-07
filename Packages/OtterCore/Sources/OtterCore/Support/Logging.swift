@@ -4,7 +4,7 @@ import os
 /// One logger per ARCHITECTURE §10 category. Never log note contents —
 /// only capture IDs, byte counts, destination IDs and error codes.
 public extension Logger {
-    static let subsystem = "com.yourname.otter"
+    static let subsystem = "io.github.elizabeth-ling.otter"
 
     /// The menu bar, notifications, the login item and other app lifecycle.
     static let app = Logger(subsystem: subsystem, category: "app")

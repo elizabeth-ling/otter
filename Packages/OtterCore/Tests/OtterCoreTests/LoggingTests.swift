@@ -3,5 +3,5 @@ import Testing
 @testable import OtterCore
 
 @Test func loggerSubsystemMatchesBundleIdentifier() {
-    #expect(Logger.subsystem == "com.yourname.otter")
+    #expect(Logger.subsystem == "io.github.elizabeth-ling.otter")
 }

@@ -29,6 +29,7 @@ final class SettingsModel {
     @ObservationIgnored private let delivery: DeliveryService
     @ObservationIgnored private let recents: RecentStore
     @ObservationIgnored private let panel: PanelController
+    @ObservationIgnored private let updates: UpdateController
     @ObservationIgnored private var healthTask: Task<Void, Never>?
     @ObservationIgnored private var statusTask: Task<Void, Never>?
     @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
@@ -100,7 +101,18 @@ final class SettingsModel {
         }
     }
 
-    init(pipeline: CapturePipeline, hotkeys: HotkeyService, folderChooser: FolderChooser, panel: PanelController) {
+    /// "Automatically check for updates" (T13): Sparkle keeps it. Off, Otter makes no network
+    /// requests at all.
+    var automaticallyChecksForUpdates: Bool {
+        didSet { updates.automaticallyChecksForUpdates = automaticallyChecksForUpdates }
+    }
+
+    /// False when the updater couldn't start, e.g. a local build without Sparkle's public key.
+    var updatesAvailable: Bool {
+        updates.isAvailable
+    }
+
+    init(pipeline: CapturePipeline, hotkeys: HotkeyService, folderChooser: FolderChooser, panel: PanelController, updates: UpdateController) {
         registry = pipeline.destinations
         outbox = pipeline.outbox
         delivery = pipeline.delivery
@@ -108,6 +120,8 @@ final class SettingsModel {
         self.hotkeys = hotkeys
         self.folderChooser = folderChooser
         self.panel = panel
+        self.updates = updates
+        automaticallyChecksForUpdates = updates.automaticallyChecksForUpdates
         keepPanelOpen = settings.keepPanelOpenWhenClickingElsewhere
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
@@ -337,6 +351,10 @@ final class SettingsModel {
         Self.reveal(StorageLocations.outbox, creating: true)
     }
 
+    func checkForUpdates() {
+        updates.checkForUpdates()
+    }
+
     func clearRecents() {
         Task { [recents] in
             await recents.clear()
@@ -360,7 +378,7 @@ final class SettingsModel {
     /// they were on first launch. Waiting captures go to the default inbox, so nothing is lost.
     func resetAll() async {
         hotkeys.resetShortcuts { [settings] in
-            settings.resetAll(domain: Bundle.main.bundleIdentifier ?? "com.yourname.otter")
+            settings.resetAll(domain: Bundle.main.bundleIdentifier ?? "io.github.elizabeth-ling.otter")
         }
 
         let inbox = DestinationConfig.defaultInbox()
@@ -376,6 +394,8 @@ final class SettingsModel {
         fontSize = settings.fontSize
         smartQuotesAndDashes = settings.smartQuotesAndDashes
         remembersRecents = settings.remembersRecents
+        updates.settingsDidReset()
+        automaticallyChecksForUpdates = updates.automaticallyChecksForUpdates
         // The login item stays as it is; the stored preference follows it.
         settings.launchAtLogin = launchAtLogin
         panel.resetPanelPosition()

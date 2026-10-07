@@ -29,6 +29,12 @@
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Otter adds your quick notes to Apple Notes.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string></string>
+	<string>© 2026 Elizabeth Ling. MIT License.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/elizabeth-ling/otter/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 </dict>
 </plist>
