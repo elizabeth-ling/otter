@@ -60,6 +60,7 @@ Otter/
 │   │           LoginItem.swift   # launch at login: SMAppService.mainApp, registered only when the user chooses (T12)
 │   ├── Updates/UpdateController.swift   # Sparkle 2: daily check, "Check for Updates…", gentle reminders; off in Debug builds (T13)
 │   ├── Onboarding/OnboardingModel.swift, OnboardingView.swift   # first run: hotkey, destination, try it (T10)
+│   ├── TestHooks/TestHooks.swift, SoakRunner.swift, BenchRunner.swift   # --otter-soak / --otter-bench, OTTER_TEST_HOOKS builds only (T14, §11)
 │   └── Resources/Info.plist, Assets.xcassets
 └── Packages/OtterCore/
     ├── Sources/OtterCore/
@@ -86,9 +87,12 @@ Otter/
     │   │           OnboardingHotkeyStatus.swift   # onboarding step 1: press to confirm, wait for Spotlight (T10)
     │   ├── Settings/AppSettings.swift   # UserDefaults-backed preferences, Reset all (T10)
     │   └── Support/Logging.swift     # Logger categories (§10), shared by app and core
-    │               Signposts.swift   # os_signpost intervals (§9)
+    │               Signposts.swift   # os_signpost intervals (§9); ProcessLaunch (time since the process started)
+    │               AtomicWriteLeftovers.swift   # sweeps `.sb-` temp files a kill leaves beside an atomic save (T14)
     └── Tests/OtterCoreTests/
 ├── scripts/release.sh, cask.sh   # signed + notarized DMG, appcast, release notes; Homebrew cask (T13, ADR-019)
+│   ├── soak.sh                   # 1,000 captures with random kill -9s; 0 lost (T14)
+│   └── perf.sh, perf_report.py   # §9 budget: signposts, memory, wakeups → PERF.md (T14)
 ├── .github/workflows/ci.yml, release.yml   # tests + build on every push; a `v*` tag publishes a release (T13)
 ├── CHANGELOG.md                  # one section per version: GitHub release notes and Sparkle's update notes
 └── LICENSE                       # MIT
@@ -281,7 +285,7 @@ Settings in `UserDefaults` (domain `io.github.elizabeth-ling.otter`), including 
 | `⌘↩` → panel hidden | < 50 ms | Outbox write only; formatting happens in delivery |
 | Idle | 0% CPU, < 40 MB | No timers when outbox empty; release attachment thumbnails on hide |
 
-Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, `enqueue→delivered` (per destination), `restyle` (per edit). T14 verifies.
+Instrumented with `os_signpost` in Points of Interest: a `hotkey ready` event (ms since the process started), and the intervals `hotkey→visible`, `submit→hidden`, `enqueue→delivered` (per capture, destination ID as the message) and `restyle` (per edit). `scripts/perf.sh` measures all of them, plus idle memory and wakeups; results are in `context/docs/PERF.md` (T14).
 
 ## 10. Error handling and logging
 
@@ -293,7 +297,10 @@ Instrument with `os_signpost` intervals: `hotkey→visible`, `submit→hidden`, 
 
 - **OtterCore unit tests** (fast, run in CI): Markdown formatting, inline styling, list items and hidden-marker editing rules, file naming, title sanitizing, template rendering, Moment→DateFormatter translation, Obsidian config parsing against fixture vaults, attachment-path resolution, Notes HTML escaping (T08), outbox crash-recovery (enqueue → simulate crash → reload → deliver), retry scheduling with a `FakeDestination`.
 - **Integration tests** (local only): Folder/Obsidian destinations against temp directories; Apple Notes (T08, after v1) behind an env flag because it needs TCC.
-- **Manual test matrix** (T14): Spaces, full-screen apps, Stage Manager, multiple displays, IME input, Dark/Light, accessibility settings, iCloud Drive vaults.
+- **Soak test** (T14, local): `scripts/soak.sh` submits 1,000 synthetic captures through the real app (`--otter-soak`) while `kill -9`ing it at random, then checks every acknowledged capture reached a destination. Target: 0 lost.
+- **Benchmarks** (T14, local): `scripts/perf.sh`, see §9.
+- **Test hooks:** the soak and the benchmarks are launch arguments compiled only with `OTTER_TEST_HOOKS` (Debug, and `perf.sh`'s Release build), never into a shipped build. They require `--otter-dir`, which moves the outbox, draft, recents, destinations and preferences (a separate suite) into that folder, so they never touch the user's notes or settings (`App/TestHooks/`).
+- **Manual test matrix** (T14, `context/docs/TEST_MATRIX.md`): Spaces, full-screen apps, Stage Manager, multiple displays, IME input, Dark/Light, accessibility settings, iCloud Drive vaults, time zones, lifecycle, hotkeys, privacy.
 
 ## 12. Dependencies
 
