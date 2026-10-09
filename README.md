@@ -1,5 +1,7 @@
 # otter
 
+[![Download Otter for macOS](https://img.shields.io/github/v/release/elizabeth-ling/otter?label=Download%20.dmg&logo=apple&style=for-the-badge&color=black)](https://github.com/elizabeth-ling/otter/releases/latest)
+
  otter is a FOS macOS menu-bar utility for capturing notes. what quick notes should've been. press a hotkey from anywhere, a small floating panel appears, type, hit `⌘↩`, and the note is filed into the notes system of your choice
 
  connects to obsidian and Apple native folders. 
