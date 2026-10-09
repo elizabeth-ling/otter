@@ -16,19 +16,19 @@ final class CapturePipeline {
     private var wakeObserver: (any NSObjectProtocol)?
 
     /// No file I/O: the outbox and recents are read on first use, and the default inbox folder is
-    /// created on the first save.
-    init() {
+    /// created on the first save. The test hooks (T14) pass their own `defaults` and `documents`.
+    init(defaults: UserDefaults = .standard, documents: URL = .documentsDirectory) {
         // The builder saves re-created bookmarks back to the registry it's registered with.
         let registryReference = RegistryReference()
         var factory = DestinationFactory()
         factory.registerFolder { id, bookmark, displayPath in
             registryReference.registry?.updateFolderBookmark(id, bookmark: bookmark, displayPath: displayPath)
         }
-        let destinations = DestinationRegistry(defaults: .standard, factory: factory)
+        let destinations = DestinationRegistry(defaults: defaults, factory: factory)
         registryReference.registry = destinations
-        destinations.addDefaultInboxIfEmpty()
+        destinations.addDefaultInboxIfEmpty(documents: documents)
         let outbox = Outbox(directory: StorageLocations.outbox)
-        let recents = RecentStore(fileURL: StorageLocations.recents, isEnabled: AppSettings().remembersRecents)
+        let recents = RecentStore(fileURL: StorageLocations.recents, isEnabled: AppSettings(defaults: defaults).remembersRecents)
         let delivery = DeliveryService(
             outbox: outbox,
             destinations: { destinations.destination(for: $0) },

@@ -3,8 +3,12 @@ import Foundation
 /// Where Otter keeps its files: `~/Library/Application Support/Otter/` (ARCHITECTURE §8).
 /// Nothing is created here. Each store creates what it needs on first write, so launch does no disk work.
 public enum StorageLocations {
+    /// Replaces `root` for the soak test and the benchmarks (T14), so they never touch the user's
+    /// outbox or draft. Set once at launch, before any store is created; `nil` in a normal run.
+    public nonisolated(unsafe) static var rootOverride: URL?
+
     public static var root: URL {
-        URL.applicationSupportDirectory.appendingPathComponent("Otter", isDirectory: true)
+        rootOverride ?? URL.applicationSupportDirectory.appendingPathComponent("Otter", isDirectory: true)
     }
 
     public static var outbox: URL {

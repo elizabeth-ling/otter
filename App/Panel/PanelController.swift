@@ -46,6 +46,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var fadeGeneration = 0
     /// A `hotkey→visible` interval is open and ends when the panel becomes key.
     private var awaitingVisible = false
+    /// A `submit→hidden` interval is open and ends when the panel starts hiding.
+    private var awaitingHidden = false
     /// Otter is setting the frame itself, so `windowDidMove` mustn't save it as the user's position.
     private var isPlacing = false
     /// The saved draft is put in the editor on the first show; after that the editor keeps its text.
@@ -64,6 +66,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var appToReactivate: NSRunningApplication?
 
     private var isShown: Bool { panel.isVisible && !isHiding }
+
+    #if OTTER_TEST_HOOKS
+    /// Called as the panel starts hiding, for the benchmarks (T14).
+    var testOnHide: (@MainActor () -> Void)?
+    #endif
 
     /// - Parameters:
     ///   - destination: The destination with an ID, or the default for `nil` or an ID that's gone.
@@ -208,6 +215,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         fadeGeneration += 1
         let generation = fadeGeneration
         isHiding = true
+        endHiddenSignpost()
+        #if OTTER_TEST_HOOKS
+        testOnHide?()
+        #endif
         if didRestoreDraft {
             draftStore.saveNow(currentDraft)
         }
@@ -310,6 +321,20 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func beginVisibleSignpost() {
         awaitingVisible = true
         os_signpost(.begin, log: Signpost.log, name: Signpost.hotkeyToVisible)
+    }
+
+    private func beginHiddenSignpost() {
+        awaitingHidden = true
+        os_signpost(.begin, log: Signpost.log, name: Signpost.submitToHidden)
+    }
+
+    /// Also called when a failed save keeps the panel open, so the interval doesn't stay open.
+    private func endHiddenSignpost() {
+        guard awaitingHidden else {
+            return
+        }
+        awaitingHidden = false
+        os_signpost(.end, log: Signpost.log, name: Signpost.submitToHidden)
     }
 
     /// A resign-key just before this hid the panel: bring it back.
@@ -570,6 +595,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         let text = content.editor.text
         let submitted = attachments
         let destinationID = noteDestinationID
+        if closeAfter {
+            beginHiddenSignpost()
+        }
         guard !isNoteEmpty else {
             if closeAfter {
                 hide()
@@ -582,6 +610,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             let saved = await submitNote(text, file, submitted, destinationID)
             isSubmitting = false
             guard saved else {
+                endHiddenSignpost()
                 return
             }
             // The next note goes to the default again.
@@ -656,6 +685,17 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 }
+
+#if OTTER_TEST_HOOKS
+/// For the benchmarks (T14).
+extension PanelController {
+    var testWindow: NSWindow { panel }
+
+    func testSetText(_ text: String) {
+        content.editor.setText(text)
+    }
+}
+#endif
 
 /// The destination shown in the panel header, or one in its menu.
 struct PanelDestination {

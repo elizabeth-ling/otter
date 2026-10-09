@@ -99,6 +99,7 @@ public actor Outbox {
         }
         items[capture.id] = item
         lastSequence = item.sequence
+        os_signpost(.begin, log: Signpost.log, name: Signpost.enqueueToDelivered, signpostID: Signpost.id(for: capture.id), "%{public}s", capture.destinationID.description)
 
         // Committed. The capture now lives here, so the staged originals can go.
         for source in attachmentFiles {

@@ -226,6 +226,7 @@ public actor DeliveryService {
                 await recordFailure(of: head, error: error)
                 break
             }
+            os_signpost(.end, log: Signpost.log, name: Signpost.enqueueToDelivered, signpostID: Signpost.id(for: captureID), "%{public}s", id.description)
             Logger.pipeline.info("Delivered \(captureID, privacy: .public) to \(id, privacy: .public) after \(head.attempts + 1, privacy: .public) attempt(s)")
             await recents?.record(head.capture, receipt: receipt, destinationName: destination.displayName)
             let delivery = Delivery(captureID: captureID, destinationID: id, destinationName: destination.displayName, receipt: receipt)
