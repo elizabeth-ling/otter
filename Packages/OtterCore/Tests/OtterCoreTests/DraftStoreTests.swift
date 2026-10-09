@@ -123,3 +123,24 @@ private func draftFile(in root: URL) -> URL {
     let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
     #expect(Set(object.keys) == ["text", "attachmentRefs", "updatedAt"])
 }
+
+/// A kill during an atomic save leaves `current.json.sb-…`, holding the note (T14 soak).
+@Test func leftoverTempFilesOfAKilledSaveAreDeletedOnLoadAndOnClear() throws {
+    let root = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = draftFile(in: root)
+    let leftover = file.deletingLastPathComponent().appendingPathComponent("current.json.sb-1a2b3c4d-XyZ123")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    FileManager.default.createFile(atPath: leftover.path, contents: Data("the note".utf8))
+
+    let store = DraftStore(fileURL: file)
+    #expect(store.load() == nil)
+    #expect(!FileManager.default.fileExists(atPath: leftover.path))
+
+    store.saveNow(makeDraft())
+    store.flush()
+    FileManager.default.createFile(atPath: leftover.path, contents: Data("the note".utf8))
+    store.clear()
+    store.flush()
+    #expect(!FileManager.default.fileExists(atPath: leftover.path))
+}

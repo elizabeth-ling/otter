@@ -55,3 +55,23 @@ private func receipt(_ seconds: TimeInterval) -> DeliveryReceipt {
     #expect(cut.count == 80)
     #expect(cut.hasSuffix("…"))
 }
+
+/// A kill during an atomic save leaves `recent.json.sb-…`, holding the start of notes (T14 soak).
+@Test func leftoverTempFilesOfAKilledSaveAreDeletedOnFirstReadAndOnClear() async throws {
+    let root = try makeTemporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appendingPathComponent("recent.json")
+    let leftover = root.appendingPathComponent("recent.json.sb-c9794303-o7tYVp")
+    let unrelated = root.appendingPathComponent("recent.json.bak")
+    FileManager.default.createFile(atPath: leftover.path, contents: Data("first line".utf8))
+    FileManager.default.createFile(atPath: unrelated.path, contents: Data())
+
+    let store = RecentStore(fileURL: file)
+    #expect(await store.recent().isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: leftover.path))
+    #expect(FileManager.default.fileExists(atPath: unrelated.path))
+
+    FileManager.default.createFile(atPath: leftover.path, contents: Data("first line".utf8))
+    await store.clear()
+    #expect(!FileManager.default.fileExists(atPath: leftover.path))
+}

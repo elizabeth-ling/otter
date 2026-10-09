@@ -68,6 +68,7 @@ public actor RecentStore {
 
     public func clear() {
         cache = []
+        AtomicWriteLeftovers.remove(besides: fileURL)
         do {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 try FileManager.default.removeItem(at: fileURL)
@@ -96,6 +97,8 @@ public actor RecentStore {
         if let cache {
             return cache
         }
+        // Actor-isolated like `save`, so no write is running.
+        AtomicWriteLeftovers.remove(besides: fileURL)
         var entries: [RecentCapture] = []
         if FileManager.default.fileExists(atPath: fileURL.path) {
             do {

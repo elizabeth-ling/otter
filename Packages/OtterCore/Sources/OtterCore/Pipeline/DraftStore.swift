@@ -148,6 +148,7 @@ public final class DraftStore: @unchecked Sendable {
     }
 
     private func deleteFile() {
+        AtomicWriteLeftovers.remove(besides: fileURL)
         do {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 try FileManager.default.removeItem(at: fileURL)
@@ -157,7 +158,9 @@ public final class DraftStore: @unchecked Sendable {
         }
     }
 
+    /// Runs before the first write: the panel saves only once the draft is loaded.
     private func readFile() -> Draft? {
+        AtomicWriteLeftovers.remove(besides: fileURL)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return nil
         }
