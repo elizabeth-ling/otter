@@ -230,7 +230,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.elizabeth-ling.otter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SPARKLE_PUBLIC_ED_KEY = "";
+				SPARKLE_PUBLIC_ED_KEY = "DE2RfRseVhOu/pUy/QFUK6Et8u/DN8foYjDlC8j5Yn0=";
 			};
 			name = Debug;
 		};
@@ -253,7 +253,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.elizabeth-ling.otter";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SPARKLE_PUBLIC_ED_KEY = "";
+				SPARKLE_PUBLIC_ED_KEY = "DE2RfRseVhOu/pUy/QFUK6Et8u/DN8foYjDlC8j5Yn0=";
 			};
 			name = Release;
 		};
