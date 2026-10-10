@@ -51,8 +51,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         if let button = statusItem.button {
             // A template image follows the menu bar's appearance and tint; the badge is a view on top.
-            let image = NSImage(systemSymbolName: "square.and.pencil", accessibilityDescription: "Otter")
+            // The app icon's glyph, a vector in the asset catalog, sized to the menu bar's 16pt cap height.
+            let image = NSImage(named: "MenuBarIcon")
+            image?.size = NSSize(width: 16 * 591 / 700, height: 16)
             image?.isTemplate = true
+            image?.accessibilityDescription = "Otter"
             button.image = image
             badge.install(in: button)
         }
@@ -232,14 +235,14 @@ private final class BadgeDot: NSView {
         nil
     }
 
-    /// Bottom-right of the button, clear of the pencil.
+    /// Top-right of the button, clear of the glyph's full stop.
     func install(in button: NSView) {
         button.addSubview(self)
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: Self.diameter),
             heightAnchor.constraint(equalToConstant: Self.diameter),
-            trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
-            bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -4),
+            trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -1),
+            topAnchor.constraint(equalTo: button.topAnchor, constant: 1),
         ])
     }
 }
