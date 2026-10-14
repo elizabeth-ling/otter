@@ -143,6 +143,13 @@ final class EditorView: NSScrollView {
         setText("")
     }
 
+    /// Closes macOS's autocorrect bubble without applying its correction. Call before the panel
+    /// hides: the bubble's windows otherwise outlive the hide, and AppKit tries to make them key
+    /// on the next show.
+    func dismissCorrectionIndicator() {
+        NSSpellChecker.shared.dismissCorrectionIndicator(for: textView)
+    }
+
     /// `⇧⌘⌫`: deletes everything as one edit, so `⌘Z` brings it back.
     func discardText() {
         let all = NSRange(location: 0, length: (textView.string as NSString).length)
@@ -196,9 +203,20 @@ final class EditorTextView: NSTextView {
     /// Dragging in the text selects text; it never moves the window.
     override var mouseDownCanMoveWindow: Bool { false }
 
-    /// `NSTextView` turns `Esc` into "complete"; hide the panel instead.
+    /// `NSTextView` turns `Esc` into "complete"; hide the panel instead. With macOS's autocorrect
+    /// bubble showing, `Esc` only rejects the correction, as in other text views.
     override func cancelOperation(_ sender: Any?) {
+        if isShowingCorrectionIndicator {
+            NSSpellChecker.shared.dismissCorrectionIndicator(for: self)
+            return
+        }
         window?.cancelOperation(sender)
+    }
+
+    /// AppKit has no public way to ask, so this looks for the bubble's windows (`NSCorrectionPanel`
+    /// and `NSCorrectionSubPanel`). Should they be renamed, `Esc` just hides the panel straight away.
+    private var isShowingCorrectionIndicator: Bool {
+        NSApp.windows.contains { $0.isVisible && $0.className.hasPrefix("NSCorrection") }
     }
 
     // MARK: Paste and drop (T09)

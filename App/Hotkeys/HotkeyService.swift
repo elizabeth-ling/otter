@@ -59,6 +59,8 @@ final class HotkeyService {
     @ObservationIgnored private var appActivationObserver: (any NSObjectProtocol)?
     /// Each name's last accepted shortcut, so a refused recording can be put back.
     @ObservationIgnored private var acceptedShortcuts: [KeyboardShortcuts.Name: HotkeyCombo] = [:]
+    /// The panel has keyboard focus and takes the toggle chord itself (`setToggleSuspended(_:)`).
+    @ObservationIgnored private var isToggleSuspended = false
 
     /// Registers the hotkeys. Call once at launch.
     func start() {
@@ -131,6 +133,34 @@ final class HotkeyService {
         Logger.hotkey.info("Shortcuts reset to their defaults")
     }
 
+    /// Whether a key-down is the effective toggle chord. While the toggle is suspended the panel
+    /// checks its own key-downs with this.
+    func isToggleChord(_ event: NSEvent) -> Bool {
+        guard let combo = effectiveToggle.combo else {
+            return false
+        }
+        return KeyboardShortcuts.Shortcut(event: event).map(HotkeyCombo.init) == combo
+    }
+
+    /// Unregisters the toggle hotkey while the panel has keyboard focus, and registers it again
+    /// after. A focused panel gets the chord as an ordinary key press anyway, and has to: macOS's
+    /// autocorrect bubble runs its own event loop, which holds hotkey events until it closes but
+    /// still passes key presses on.
+    func setToggleSuspended(_ suspended: Bool) {
+        guard suspended != isToggleSuspended else {
+            return
+        }
+        isToggleSuspended = suspended
+        Logger.hotkey.debug("Toggle hotkey \(suspended ? "suspended" : "resumed", privacy: .public)")
+        if suspended {
+            KeyboardShortcuts.disable(.effectiveTogglePanel)
+        } else {
+            KeyboardShortcuts.enable(.effectiveTogglePanel)
+        }
+        // Disabling unregisters the chord, which the save-clipboard shortcut may share.
+        KeyboardShortcuts.enable(.saveClipboard)
+    }
+
     /// Opens System Settings › Keyboard, where Keyboard Shortcuts › Spotlight lives.
     func openSpotlightShortcutSettings() {
         let workspace = NSWorkspace.shared
@@ -152,6 +182,7 @@ final class HotkeyService {
     // MARK: - Private
 
     private func toggleKeyDown() {
+        Logger.hotkey.debug("Toggle hotkey pressed")
         // The panel controller begins the `hotkey→visible` signpost when the press shows the panel.
         onTogglePanel?()
         // "Re-probe when the panel opens", kept off the hotkey → visible path.
@@ -183,6 +214,10 @@ final class HotkeyService {
         // the internal name stays registered. Order matters: they can share a chord.
         KeyboardShortcuts.disable(.togglePanel)
         KeyboardShortcuts.setShortcut(decision.combo.map(KeyboardShortcuts.Shortcut.init), for: .effectiveTogglePanel)
+        if isToggleSuspended {
+            // Setting the shortcut registered it; the focused panel still takes the chord itself.
+            KeyboardShortcuts.disable(.effectiveTogglePanel)
+        }
         // Unregistering above can drop a chord the save-clipboard shortcut shared mid-recording.
         // Registering is idempotent.
         KeyboardShortcuts.enable(.saveClipboard)
