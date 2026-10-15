@@ -109,6 +109,12 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         return codeBlocks
     }
 
+    /// The text that's code: each inline code span, backticks included, and each fenced code
+    /// block, fences included. Spelling isn't checked there.
+    func currentCodeRanges() -> [NSRange] {
+        currentSpans().filter { $0.kind == .code }.map(\.range) + currentCodeBlocks().map(\.range)
+    }
+
     /// Whether `item` shows its raw marker: the selection is in it.
     func isRevealed(_ item: MarkdownListItem) -> Bool {
         item.revealsMarker(for: markerSelection)

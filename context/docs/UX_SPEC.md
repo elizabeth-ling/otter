@@ -129,7 +129,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 - Styling and hiding are never undo steps. `⌘Z` brings back the text, and its styling follows; undoing the closing marker you just typed shows the markers again.
 - While an input method is composing, nothing restyles or hides; the text restyles once it's committed.
-- Spell checking works as before; hidden markers are punctuation and aren't checked. It still runs inside inline code.
+- Spell checking works as before; hidden markers are punctuation and aren't checked. Code isn't checked: inline code and code blocks get no underlines or autocorrections.
 - VoiceOver reads the saved Markdown, markers included (ADR-016).
 
 ### Lists and tasks

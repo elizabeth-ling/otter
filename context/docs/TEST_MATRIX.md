@@ -52,6 +52,7 @@ Type immediately after `Esc`, and immediately after `⌘↩`: every keystroke mu
 | Emoji picker (`⌃⌘Space`) | Opens over the panel; the emoji lands in the note; the panel doesn't hide | Not run |
 | Autocorrect bubble + toggle hotkey | Type a misspelling until macOS shows its correction bubble, press the hotkey; the panel hides and the draft keeps the typed text | Not run |
 | Autocorrect bubble + `Esc` | With the bubble showing, `Esc` dismisses the bubble only; a second `Esc` hides the panel | Not run |
+| No spelling in code | Type a misspelling in inline code and in a code block; neither is underlined or autocorrected. Wrap an underlined word in backticks; its underline goes | Not run |
 | Dictation | Dictate a sentence into the panel | Not run |
 | RTL text | Type Arabic or Hebrew; caret and styling behave; saved file is correct | Not run |
 | 1 MB paste | Paste 1 MB of text; typing stays responsive; `⌘↩` saves it whole | Not run |

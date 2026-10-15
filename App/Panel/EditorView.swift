@@ -966,6 +966,29 @@ final class EditorTextView: NSTextView {
 
     // MARK: Misspellings
 
+    /// Code isn't checked for spelling: misspellings and autocorrections in inline code or a code
+    /// block are dropped before AppKit marks or applies them.
+    override func handleTextCheckingResults(
+        _ results: [NSTextCheckingResult],
+        forRange range: NSRange,
+        types checkingTypes: NSTextCheckingTypes,
+        options: [NSSpellChecker.OptionKey: Any] = [:],
+        orthography: NSOrthography,
+        wordCount: Int
+    ) {
+        let code = styler?.currentCodeRanges() ?? []
+        let kept = code.isEmpty ? results : results.filter { result in
+            !Self.uncheckedInCode.contains(result.resultType) || !Self.intersects(result.range, code)
+        }
+        super.handleTextCheckingResults(kept, forRange: range, types: checkingTypes, options: options, orthography: orthography, wordCount: wordCount)
+    }
+
+    private static let uncheckedInCode: NSTextCheckingResult.CheckingType = [.spelling, .correction]
+
+    private static func intersects(_ range: NSRange, _ ranges: [NSRange]) -> Bool {
+        ranges.contains { NSIntersectionRange($0, range).length > 0 }
+    }
+
     /// Marks misspelled words for `drawMisspellings(in:)` instead of macOS's own dots. AppKit
     /// still marks and clears them as usual: it only clears where its spelling state is set, so
     /// that's kept, with a value it counts as set but doesn't draw. Grammar keeps macOS's look.
@@ -992,19 +1015,27 @@ final class EditorTextView: NSTextView {
 
     /// A row of red dots under each misspelled word in `rect`, a little smaller than macOS's (3 pt
     /// on a 4 pt pitch) so they're quieter, and centred where macOS's are, just under the baseline.
+    /// None in code: a word marked before it became code keeps its mark until it's checked again.
     private func drawMisspellings(in rect: NSRect) {
         guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else {
             return
         }
         let origin = textContainerOrigin
-        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? content.documentRange.location
+        let documentStart = content.documentRange.location
+        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
         let bottom = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: rect.maxY - origin.y))?.rangeInElement.endLocation ?? content.documentRange.endLocation
+        let code = styler?.currentCodeRanges() ?? []
         var misspellings: [NSTextRange] = []
         layoutManager.enumerateRenderingAttributes(from: top, reverse: false) { _, attributes, range in
             guard range.location.compare(bottom) == .orderedAscending else {
                 return false
             }
-            if attributes[Self.misspelledKey] != nil {
+            guard attributes[Self.misspelledKey] != nil else {
+                return true
+            }
+            let location = content.offset(from: documentStart, to: range.location)
+            let length = content.offset(from: range.location, to: range.endLocation)
+            if !Self.intersects(NSRange(location: location, length: length), code) {
                 misspellings.append(range)
             }
             return true

@@ -236,7 +236,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - `MarkdownBlocks` (OtterCore) finds both; `MarkdownStyler` applies them as display-only attributes (ADR-016).
 - Settings › General › Line spacing: Comfortable, the default, adds 0.25 em after each line through every paragraph style; Compact is the spacing from before.
 
-**Consequences.** Moving the caret onto or off a heading re-attributes that line, and its text shifts by the width of its `#`s, as in Obsidian. A click left of a hidden heading's text can put the caret before its `#`s. An unclosed fence makes the rest of the note code until it's closed. Spell checking still runs in code blocks.
+**Consequences.** Moving the caret onto or off a heading re-attributes that line, and its text shifts by the width of its `#`s, as in Obsidian. A click left of a hidden heading's text can put the caret before its `#`s. An unclosed fence makes the rest of the note code until it's closed. Spelling isn't checked in code blocks or inline code.
 
 ---
 
