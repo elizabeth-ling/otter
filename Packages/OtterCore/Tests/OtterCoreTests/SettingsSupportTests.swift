@@ -24,6 +24,7 @@ private func folderConfig(_ name: String, displayPath: String? = nil, mode: Fold
     #expect(settings.keepPanelOpenWhenClickingElsewhere == false)
     #expect(settings.fontFamily == .system)
     #expect(settings.fontSize == 15)
+    #expect(settings.lineSpacing == .comfortable)
     #expect(settings.smartQuotesAndDashes == false)
     #expect(settings.launchAtLogin == true)
     #expect(settings.remembersRecents == true)
@@ -36,12 +37,14 @@ private func folderConfig(_ name: String, displayPath: String? = nil, mode: Fold
     let settings = AppSettings(defaults: suite.defaults)
     settings.fontFamily = .monospaced
     settings.fontSize = 99
+    settings.lineSpacing = .compact
     settings.launchAtLogin = false
     settings.remembersRecents = false
 
     let reread = AppSettings(defaults: suite.defaults)
     #expect(reread.fontFamily == .monospaced)
     #expect(reread.fontSize == AppSettings.fontSizes.upperBound)
+    #expect(reread.lineSpacing == .compact)
     #expect(reread.launchAtLogin == false)
     #expect(reread.remembersRecents == false)
 

@@ -54,6 +54,13 @@ final class SettingsModel {
         }
     }
 
+    var lineSpacing: EditorLineSpacing {
+        didSet {
+            settings.lineSpacing = lineSpacing
+            panel.applyEditorSettings()
+        }
+    }
+
     var smartQuotesAndDashes: Bool {
         didSet {
             settings.smartQuotesAndDashes = smartQuotesAndDashes
@@ -125,6 +132,7 @@ final class SettingsModel {
         keepPanelOpen = settings.keepPanelOpenWhenClickingElsewhere
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
+        lineSpacing = settings.lineSpacing
         smartQuotesAndDashes = settings.smartQuotesAndDashes
         remembersRecents = settings.remembersRecents
         reloadDestinations()
@@ -392,6 +400,7 @@ final class SettingsModel {
         keepPanelOpen = settings.keepPanelOpenWhenClickingElsewhere
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
+        lineSpacing = settings.lineSpacing
         smartQuotesAndDashes = settings.smartQuotesAndDashes
         remembersRecents = settings.remembersRecents
         updates.settingsDidReset()

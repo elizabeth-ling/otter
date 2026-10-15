@@ -61,6 +61,16 @@ final class EditorView: NSScrollView {
         }
     }
 
+    /// The Line spacing setting. Changing it restyles the text.
+    var lineSpacing: EditorLineSpacing {
+        get { styler.lineSpacing }
+        set {
+            styler.lineSpacing = newValue
+            textView.typingAttributes = styler.baseAttributes
+            textView.listMarkersDidChange()
+        }
+    }
+
     /// "Smart quotes and dashes" (UX_SPEC §5). Off by default: notes often contain code.
     var smartQuotesAndDashes: Bool {
         get { textView.isAutomaticQuoteSubstitutionEnabled }
@@ -485,7 +495,7 @@ final class EditorTextView: NSTextView {
         super.setSelectedRanges([NSValue(range: selection)], affinity: affinity, stillSelecting: stillSelectingFlag)
         isLinkRevealed = reveal
         styler.reveal(reveal ? selection : nil)
-        if styler.revealItems(on: selection) {
+        if styler.revealMarkers(on: selection) {
             listMarkersDidChange()
         }
         // `NSTextView` takes the typing attributes from the text at the caret, which may be hidden.
@@ -816,6 +826,8 @@ final class EditorTextView: NSTextView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        // Under the text: the view doesn't draw its background, so nothing covers these.
+        drawCodeBlockBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
         for marker in listMarkers(in: dirtyRect) {
             draw(marker)
@@ -831,6 +843,51 @@ final class EditorTextView: NSTextView {
         let origin = NSPoint(x: textContainerOrigin.x + padding, y: textContainerOrigin.y)
         (placeholder as NSString).draw(at: origin, withAttributes: attributes)
     }
+
+    // MARK: Code blocks
+
+    /// A faint rounded block behind each fenced code block in `rect`, fences included, the text
+    /// container's width. Uses TextKit 2's layout fragments only, as `listMarkers(in:)` does.
+    private func drawCodeBlockBackgrounds(in rect: NSRect) {
+        guard let styler, let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else {
+            return
+        }
+        let blocks = styler.currentCodeBlocks()
+        guard !blocks.isEmpty else {
+            return
+        }
+        let origin = textContainerOrigin
+        let documentStart = content.documentRange.location
+        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
+        // Each block's extent in this rect; one cut off by the rect runs past it, so the corners
+        // are only drawn where the block really starts and ends.
+        var extents: [Int: (minY: CGFloat, maxY: CGFloat)] = [:]
+        layoutManager.enumerateTextLayoutFragments(from: top, options: [.ensuresLayout]) { fragment in
+            let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+            guard frame.minY <= rect.maxY else {
+                return false
+            }
+            let start = content.offset(from: documentStart, to: fragment.rangeInElement.location)
+            let end = content.offset(from: documentStart, to: fragment.rangeInElement.endLocation)
+            guard let index = blocks.firstIndex(where: { start >= $0.range.location && start <= NSMaxRange($0.range) }) else {
+                return true
+            }
+            let block = blocks[index]
+            let minY = start == block.range.location ? frame.minY : rect.minY - Self.codeBlockRadius
+            let maxY = end >= NSMaxRange(block.range) ? frame.maxY : rect.maxY + Self.codeBlockRadius
+            let extent = extents[index]
+            extents[index] = (min(extent?.minY ?? minY, minY), max(extent?.maxY ?? maxY, maxY))
+            return true
+        }
+        let width = textContainer?.size.width ?? bounds.width
+        NSColor.quaternarySystemFill.setFill()
+        for extent in extents.values {
+            let block = NSRect(x: origin.x, y: extent.minY, width: width, height: extent.maxY - extent.minY)
+            NSBezierPath(roundedRect: block, xRadius: Self.codeBlockRadius, yRadius: Self.codeBlockRadius).fill()
+        }
+    }
+
+    private static let codeBlockRadius: CGFloat = 4
 
     // MARK: Bullets and checkboxes (ADR-017, ADR-018)
 

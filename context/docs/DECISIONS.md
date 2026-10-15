@@ -224,6 +224,20 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 **Consequences.** Revealing a task's marker can re-wrap its first line. The gutter is gone, so items sit as close to plain text as in Obsidian. ADR-017's other rules (keys, nesting, paste, undo, display-only) stand.
 
+## ADR-020 · `#` headings and fenced code blocks are styled; a Line spacing setting (amends ADR-016)
+
+**Context.** ADR-016 left headings and other block syntax as typed. The product owner wants `#` headings at their level's size and ```` ``` ```` blocks to look like code, plus a roomier line spacing option.
+
+**Options.** For the markers: always shown, dimmed · **hidden off the caret line, as in Obsidian** · hidden like list markers, with their own caret and `⌫` rules.
+
+**Decision.**
+- Outside a fence, up to three spaces, one to six `#`s and a space or tab make a heading: bold, at Obsidian's default sizes. Its `#`s show dimmed on a line the selection touches and hide on every other line (ADR-017's caret-line reveal, which ADR-018 dropped for lists). The caret is never in a hidden `#`, so `HiddenMarkerEditing` doesn't know about headings; arriving on a heading line from elsewhere doesn't move the caret.
+- A fenced code block, fences included, is monospaced, on a rounded block `EditorTextView` draws behind it; the fences are dimmed and nothing in a block hides. The rules for what's in a fence are `MarkdownLines`', shared with inline styles and lists.
+- `MarkdownBlocks` (OtterCore) finds both; `MarkdownStyler` applies them as display-only attributes (ADR-016).
+- Settings › General › Line spacing: Comfortable, the default, adds 0.25 em after each line through every paragraph style; Compact is the spacing from before.
+
+**Consequences.** Moving the caret onto or off a heading re-attributes that line, and its text shifts by the width of its `#`s, as in Obsidian. A click left of a hidden heading's text can put the caret before its `#`s. An unclosed fence makes the rest of the note code until it's closed. Spell checking still runs in code blocks.
+
 ---
 
 ## ADR-019 · Releases come from a `v*` tag; GitHub hosts the DMG and the appcast; the build number is the commit count

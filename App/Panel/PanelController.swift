@@ -270,7 +270,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// The Font and "Smart quotes and dashes" settings, read now. Settings calls this on a change.
+    /// The Font, Line spacing and "Smart quotes and dashes" settings, read now. Settings calls this
+    /// on a change.
     func applyEditorSettings() {
         let size = CGFloat(settings.fontSize)
         let font: NSFont = switch settings.fontFamily {
@@ -279,6 +280,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
         if content.editor.font != font {
             content.editor.font = font
+        }
+        if content.editor.lineSpacing != settings.lineSpacing {
+            content.editor.lineSpacing = settings.lineSpacing
         }
         content.editor.smartQuotesAndDashes = settings.smartQuotesAndDashes
     }
