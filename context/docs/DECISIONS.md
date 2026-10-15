@@ -224,7 +224,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 **Consequences.** Revealing a task's marker can re-wrap its first line. The gutter is gone, so items sit as close to plain text as in Obsidian. ADR-017's other rules (keys, nesting, paste, undo, display-only) stand.
 
-## ADR-020 · `#` headings and fenced code blocks are styled; a Line spacing setting (amends ADR-016)
+## ADR-020 · `#` headings and fenced code blocks are styled; a Line spacing setting (amends ADR-016) — **Line spacing setting and always-shown fences replaced by ADR-021**
 
 **Context.** ADR-016 left headings and other block syntax as typed. The product owner wants `#` headings at their level's size and ```` ``` ```` blocks to look like code, plus a roomier line spacing option.
 
@@ -253,3 +253,18 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 - **Updates in the app.** A daily check (on by default, Settings › Advanced) uses Sparkle's gentle reminders: an agent app must not bring a window up over the user's work, so the menu bar item changes to "Update Available…". Debug builds don't start the updater.
 
 **Consequences.** A release needs a clean `main` and a changelog entry, and nothing else. Changing the bundle ID reset the `UserDefaults` of existing development installs (shortcuts, settings, destinations); `~/Library/Application Support/Otter/` is keyed by name, so drafts and the outbox stayed. Rebasing `main` after a release could lower the commit count; don't. A prerelease channel would need Sparkle channels and a different feed; it's not needed for v1.
+
+---
+
+## ADR-021 · One line spacing; code block fences hide off the block (amends ADR-020)
+
+**Context.** The product owner wants the editor's spacing to match Obsidian's (reference: `context/ui/line-spacing-ref.png`) with no setting, ```` ``` ```` fences out of sight unless you're editing the block, and code boxes lined up with the text's left edge.
+
+**Decision.**
+- Every line has 0.35 em after it (5 pt at 15 pt), about Obsidian's 1.5 line height. Settings › General › Line spacing is gone; a stored value is ignored.
+- A code block's fences show, dimmed, while the selection touches the block, and hide otherwise, as a heading's `#`s do (ADR-020). A hidden fence keeps a fixed height as the block's padding (0.3 em above the code, 0.8 em below, since TextKit 2 already puts the code's first line's spacing above it), and the opening one 0.25 em more as the gap above the block. The caret is never in a hidden fence: arriving on one shows it.
+- An inline code span's last backtick on each side is hidden in a clear font that makes it as wide as the box's padding (about 3 pt), so the box starts at the text's edge and the text sits inside it. Not a kern: TextKit 2 reports a kerned character's edge halfway through the kern and drops a kern at a line's end.
+- Every line's paragraph style covers the whole line. A line starting with a hidden marker used to take no paragraph style, and so no line spacing, from that marker.
+
+**Consequences.** Moving the caret into or out of a code block grows or shrinks it by its fences' lines, as in Obsidian. Headings and lines starting with a styled span now get the same spacing as other lines.
+

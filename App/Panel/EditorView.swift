@@ -61,16 +61,6 @@ final class EditorView: NSScrollView {
         }
     }
 
-    /// The Line spacing setting. Changing it restyles the text.
-    var lineSpacing: EditorLineSpacing {
-        get { styler.lineSpacing }
-        set {
-            styler.lineSpacing = newValue
-            textView.typingAttributes = styler.baseAttributes
-            textView.listMarkersDidChange()
-        }
-    }
-
     /// "Smart quotes and dashes" (UX_SPEC §5). Off by default: notes often contain code.
     var smartQuotesAndDashes: Bool {
         get { textView.isAutomaticQuoteSubstitutionEnabled }
@@ -901,7 +891,7 @@ final class EditorTextView: NSTextView {
         }
         let width = textContainer?.size.width ?? bounds.width
         for extent in extents.values {
-            let minY = extent.starts ? extent.minY : rect.minY - Self.codeBlockRadius
+            let minY = extent.starts ? extent.minY + styler.codeBlockMargin : rect.minY - Self.codeBlockRadius
             let maxY = extent.ends ? extent.maxY : rect.maxY + Self.codeBlockRadius
             let block = NSRect(x: origin.x, y: minY, width: width, height: maxY - minY)
             drawCodeBox(block, radius: Self.codeBlockRadius)
@@ -948,7 +938,8 @@ final class EditorTextView: NSTextView {
         }
     }
 
-    private static let inlineCodePadding = CGSize(width: 3, height: 1)
+    /// Around an inline code span's text. The span's hidden backticks are as wide as its width.
+    private static let inlineCodePadding = CGSize(width: MarkdownStyler.inlineCodePadding, height: 1)
     private static let inlineCodeRadius: CGFloat = 4
 
     /// A code box: a faint fill inside a hairline border, its stroke kept inside `rect`.

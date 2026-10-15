@@ -24,13 +24,7 @@ public struct MarkdownHeading: Hashable, Sendable {
     /// it, or a selection with a character on it. A selection that ends just after the line break
     /// before it doesn't.
     public func isOnLine(touchedBy selection: NSRange) -> Bool {
-        guard selection.location <= NSMaxRange(lineRange) else {
-            return false
-        }
-        if selection.length == 0 {
-            return selection.location >= lineRange.location
-        }
-        return NSMaxRange(selection) > lineRange.location
+        lines(lineRange, areTouchedBy: selection)
     }
 }
 
@@ -49,6 +43,25 @@ public struct MarkdownCodeBlock: Hashable, Sendable {
         self.openingFence = openingFence
         self.closingFence = closingFence
     }
+
+    /// Whether `selection` touches the block's lines, fences included, which shows its fences: a
+    /// caret anywhere in it, or a selection with a character in it. A selection that ends just
+    /// after the line break before it doesn't.
+    public func isTouched(by selection: NSRange) -> Bool {
+        lines(range, areTouchedBy: selection)
+    }
+}
+
+/// Whether `selection` touches the lines in `range` (no line break at its end): a caret from their
+/// start to their end, or a selection with a character in them.
+private func lines(_ range: NSRange, areTouchedBy selection: NSRange) -> Bool {
+    guard selection.location <= NSMaxRange(range) else {
+        return false
+    }
+    if selection.length == 0 {
+        return selection.location >= range.location
+    }
+    return NSMaxRange(selection) > range.location
 }
 
 /// Finds the block Markdown the panel's editor styles: `#` headings and fenced code blocks. It

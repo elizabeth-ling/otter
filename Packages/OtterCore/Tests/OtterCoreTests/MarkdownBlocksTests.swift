@@ -91,6 +91,20 @@ func theseAreNotHeadings(text: String) {
     #expect(blocks == [MarkdownCodeBlock(range: NSRange(location: 2, length: 8), openingFence: NSRange(location: 2, length: 3), closingFence: nil)])
 }
 
+@Test func aSelectionTouchingTheBlockShowsItsFences() {
+    // "x\n```\na\n```\ny": the block is 2..<11, its line break at 11.
+    let block = MarkdownBlocks.codeBlocks(in: "x\n```\na\n```\ny")[0]
+    #expect(block.isTouched(by: NSRange(location: 2, length: 0)))
+    #expect(block.isTouched(by: NSRange(location: 6, length: 0)))
+    #expect(block.isTouched(by: NSRange(location: 11, length: 0)))
+    #expect(!block.isTouched(by: NSRange(location: 1, length: 0)))
+    #expect(!block.isTouched(by: NSRange(location: 12, length: 0)))
+    #expect(block.isTouched(by: NSRange(location: 0, length: 3)))
+    #expect(block.isTouched(by: NSRange(location: 10, length: 3)))
+    // Ending just after the line break before it.
+    #expect(!block.isTouched(by: NSRange(location: 0, length: 2)))
+}
+
 @Test func severalCodeBlocks() {
     #expect(codeBlocks("```\na\n```\ntext\n```\nb\n```") == ["```\na\n```", "```\nb\n```"])
 }

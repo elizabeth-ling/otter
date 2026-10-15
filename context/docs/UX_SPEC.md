@@ -59,7 +59,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | Background | Vibrancy (`NSVisualEffectView`, `.popover`/`.hudWindow` material), thin 0.5 pt separator-color border, system shadow |
 | Stacking | Floats above all normal app windows, including full-screen apps, on whichever Space you're on |
 | Font | System font, 15 pt (setting: system / monospaced, size) |
-| Line spacing | Comfortable (default) adds 0.25 em after each line; Compact is the font's own line height (setting) |
+| Line spacing | 0.35 em after each line (5 pt at 15 pt), about Obsidian's 1.5 line height (ADR-021) |
 | Placeholder | "Jot something down…" |
 | Chrome | No title bar, no traffic lights. Dragged by the header strip or footer background; dragging in the text selects text |
 | Animation | 80 ms fade-in/out; none if Reduce Motion is on |
@@ -91,7 +91,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | `*italic*`, `_italic_` | *italic* |
 | `***both***`, `**_both_**` | bold italic |
 | `~~struck~~` | struck through |
-| `` `code` `` (any run of backticks) | `code` in the monospaced system font at the editor's size, on a faint rounded box (`quinarySystemFill`, a hairline `separatorColor` border, 4 pt corners) around the code only, one per line it wraps onto |
+| `` `code` `` (any run of backticks) | `code` in the monospaced system font at the editor's size, on a faint rounded box (`quinarySystemFill`, a hairline `separatorColor` border, 4 pt corners) around the code only, one per line it wraps onto. The hidden backticks take the box's 3 pt padding, so the box starts where the backtick did |
 | `[text](url)` | `text` in the link colour, underlined; the URL shows as a tooltip on hover. Not clickable: a click places the caret |
 
 **What's styled**
@@ -159,11 +159,12 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | Markdown | Shown as |
 |---|---|
 | `# Title` … `###### Title`, at a line's start | Bold, at Obsidian's sizes: 1.802, 1.602, 1.424, 1.266, 1.125 and 1 em of the editor's font |
-| ```` ``` ```` (or `~~~`) lines and everything between | Monospaced (the editor's font if it's monospaced already) on a faint rounded block (`quinarySystemFill`, a hairline `separatorColor` border, 6 pt corners) the width of the text, the text inset 1 em; the fence lines, info string included, in `tertiaryLabelColor` |
+| ```` ``` ```` (or `~~~`) lines and everything between | Monospaced (the editor's font if it's monospaced already) on a faint rounded block (`quinarySystemFill`, a hairline `separatorColor` border, 6 pt corners) the width of the text, the text inset 1 em; the fence lines, info string included, in `tertiaryLabelColor` while the selection touches the block, otherwise hidden |
 
 - A heading needs up to three spaces, one to six `#`s, then a space or tab: `#tag`, a lone `#`, `####### x` and a 4-space-indented `#` show as typed. Inline styles work inside a heading; a closing run of `#`s is part of its text.
 - A heading's `#`s and the spaces after them show, dimmed, while the caret is on its line or a selection touches it, and hide on every other line, as in Obsidian. A heading with no text yet (`# `) always shows them. Caret, `⌫`, `↩` and copy treat them as plain text, since they're only hidden when the caret is elsewhere.
-- A fence closes with the same marker, at least as many, and nothing after but spaces (CommonMark). Until then the block runs to the end of the note, as in Obsidian. Fences show as typed; nothing in a code block hides.
+- A fence closes with the same marker, at least as many, and nothing after but spaces (CommonMark). Until then the block runs to the end of the note, as in Obsidian. Nothing inside a code block hides.
+- A block's fences show, dimmed, while the caret is in the block or a selection touches it, and hide otherwise, as a heading's `#`s do. A hidden fence keeps a little height as the block's padding (0.3 em above the code, 0.8 em below) and a 0.25 em gap above the block. Arriving on a hidden fence with `↑` / `↓` shows it.
 - Typing a bare ```` ``` ```` or `~~~` opening fence (up to three spaces, then exactly three markers, nothing after) adds its closing fence on the next line, with the same indentation, whenever a block would otherwise be left unclosed, so it never fills the rest of the panel. The caret stays after the opening fence, for an info string; `⌘Z` removes the closing fence first. A fence that's already closed, or that closes a block, adds nothing.
 
 ## 2. Keyboard map
@@ -261,7 +262,6 @@ The tabs sit in a centred preference-style toolbar, each an icon over its name; 
 - Launch at login: shows the login item as macOS has it. While macOS waits for approval, "Approve in System Settings › General › Login Items." with an **Open Login Items** button
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
-- Line spacing: Comfortable (default) / Compact
 - Smart quotes and dashes (off by default — notes often contain code)
 - Reset panel position and size
 - A **Shortcuts…** button that goes to the Shortcuts tab

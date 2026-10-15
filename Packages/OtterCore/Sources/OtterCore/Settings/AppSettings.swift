@@ -6,14 +6,6 @@ public enum EditorFontFamily: String, CaseIterable, Sendable {
     case monospaced
 }
 
-/// The space between the editor's lines (UX_SPEC §5, Line spacing).
-public enum EditorLineSpacing: String, CaseIterable, Sendable {
-    /// The font's own line height.
-    case compact
-    /// A little more room between lines.
-    case comfortable
-}
-
 /// Otter's preferences in `UserDefaults` (UX_SPEC §5), apart from the destinations
 /// (`DestinationRegistry`), the panel's frame (`PanelFrameStore`) and the shortcuts
 /// (KeyboardShortcuts). Nothing is cached: each read goes to `defaults`, so a change made in
@@ -23,7 +15,6 @@ public struct AppSettings {
         public static let keepPanelOpen = "keepPanelOpenWhenClickingElsewhere"
         public static let fontFamily = "editorFontFamily"
         public static let fontSize = "editorFontSize"
-        public static let lineSpacing = "editorLineSpacing"
         public static let smartQuotesAndDashes = "smartQuotesAndDashes"
         public static let launchAtLogin = "launchAtLogin"
         public static let remembersRecents = "remembersRecentCaptures"
@@ -58,12 +49,6 @@ public struct AppSettings {
             return stored == 0 ? Self.defaultFontSize : Self.clampedFontSize(stored)
         }
         nonmutating set { defaults.set(Self.clampedFontSize(newValue), forKey: Key.fontSize) }
-    }
-
-    /// Comfortable by default.
-    public var lineSpacing: EditorLineSpacing {
-        get { defaults.string(forKey: Key.lineSpacing).flatMap(EditorLineSpacing.init(rawValue:)) ?? .comfortable }
-        nonmutating set { defaults.set(newValue.rawValue, forKey: Key.lineSpacing) }
     }
 
     /// Off by default: notes often contain code.

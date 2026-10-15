@@ -23,7 +23,11 @@ import os
 /// `#` headings are bold and larger by level. Their `#`s show, dimmed, on a line the selection
 /// touches, and hide on every other line, as in Obsidian. The caret is never in a hidden one, so
 /// the caret and editing rules don't know about them. Fenced code blocks are in the monospaced
-/// font with their fences dimmed, inset so `EditorTextView` can draw a block behind them.
+/// font, inset so `EditorTextView` can draw a block behind them. Their fences show, dimmed, while
+/// the selection touches the block; otherwise they hide, each line kept as the block's padding.
+///
+/// An inline code span's hidden backticks take the room of the padding of the box drawn around its
+/// text, so the box doesn't reach past the text container's edge or into the text beside it.
 @MainActor
 final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// The editor's font. Bold and italic are its faces; changing it restyles everything.
@@ -33,16 +37,6 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             markerWidths.removeAll()
             measuredLine = nil
             resetParagraphStyles()
-        }
-    }
-
-    /// The Line spacing setting: space added after each line, in em of the editor's font. Changing
-    /// it restyles everything.
-    var lineSpacing: EditorLineSpacing = .comfortable {
-        didSet {
-            if lineSpacing != oldValue {
-                resetParagraphStyles()
-            }
         }
     }
 
@@ -71,13 +65,14 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// The headings and code blocks of the text as last parsed.
     private var headings: [MarkdownHeading] = []
     private var codeBlocks: [MarkdownCodeBlock] = []
-    /// The editor's selection: items whose marker it's in, and headings on lines it touches,
-    /// show their raw marker.
+    /// The editor's selection: items whose marker it's in, headings on lines it touches and code
+    /// blocks it touches show their raw marker or fences.
     private var markerSelection = NSRange(location: 0, length: 0)
     private var markerWidths: [String: CGFloat] = [:]
     private var paragraphStyles: [ListStyle: NSParagraphStyle] = [:]
     private var measuredLine: LineMetrics?
     private var codeParagraph: NSParagraphStyle?
+    private var fenceParagraphs: [Bool: NSParagraphStyle] = [:]
     private var plainParagraph: NSParagraphStyle?
 
     init(font: NSFont) {
@@ -177,15 +172,16 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         return width
     }
 
-    /// Moves the marker reveal to the items whose marker `selection` is in and the headings on
-    /// lines it touches, re-attributing only the lines that start or stop showing their marker.
+    /// Moves the marker reveal to the items whose marker `selection` is in, the headings on lines
+    /// it touches and the code blocks it touches, re-attributing only the lines that start or stop
+    /// showing their marker or fences.
     /// Not an edit: no undo step. Returns whether any line changed, so the editor redraws its
     /// bullets and circles.
     @discardableResult
     func revealMarkers(on selection: NSRange) -> Bool {
         let old = markerSelection
         markerSelection = selection
-        guard let textStorage, !isComposing, !isStale, old != selection, !items.isEmpty || !headings.isEmpty else {
+        guard let textStorage, !isComposing, !isStale, old != selection, !items.isEmpty || !headings.isEmpty || !codeBlocks.isEmpty else {
             return false
         }
         let changed = items
@@ -194,6 +190,9 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             + headings
             .filter { revealsMarker(of: $0, for: old) != revealsMarker(of: $0, for: selection) }
             .map(\.lineRange)
+            + codeBlocks
+            .filter { $0.isTouched(by: old) != $0.isTouched(by: selection) }
+            .flatMap { [$0.openingFence] + ($0.closingFence.map { [$0] } ?? []) }
         guard !changed.isEmpty else {
             return false
         }
@@ -378,7 +377,12 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             case .bold: mark(span.contentRange, .bold)
             case .italic: mark(span.contentRange, .italic)
             case .strikethrough: mark(span.contentRange, .strikethrough)
-            case .code: mark(span.contentRange, .code)
+            case .code:
+                mark(span.contentRange, .code)
+                // The last backtick of each marker: its width pads the box drawn around the text.
+                for end in [span.contentRange.location, NSMaxRange(span.range)] {
+                    mark(NSRange(location: end - 1, length: 1), .codePadding)
+                }
             case .link:
                 mark(span.contentRange, .link)
                 if let destination = span.destinationRange {
@@ -413,10 +417,15 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             mark(line, .heading)
             mark(heading.markerRange, revealsMarker(of: heading, for: markerSelection) ? .marker : .hidden)
             blockStyle = .heading(level: heading.level)
-        case .fence:
-            mark(line, .codeBlock)
-            mark(line, .marker)
-            blockStyle = .code
+        case let .fence(codeBlock):
+            if codeBlock.isTouched(by: markerSelection) {
+                mark(line, .codeBlock)
+                mark(line, .marker)
+                blockStyle = .code
+            } else {
+                mark(line, .hidden)
+                blockStyle = .hiddenFence(isOpening: line.location == codeBlock.openingFence.location)
+            }
         case .code:
             mark(line, .codeBlock)
             blockStyle = .code
@@ -457,15 +466,23 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             let range = NSRange(location: line.location + toolTip.range.location, length: toolTip.range.length)
             textStorage.addAttribute(.toolTip, value: toolTip.text, range: range)
         }
-        if let list = style.list {
-            textStorage.addAttribute(.paragraphStyle, value: paragraphStyle(for: list), range: line)
+        // The whole line, runs included: TextKit takes a paragraph's style from its first
+        // character, which may be a hidden marker.
+        let paragraph = switch style.block {
+        case .code: codeBlockParagraph
+        case let .hiddenFence(isOpening): fenceParagraph(isOpening: isOpening)
+        case .heading, nil: style.list.map(paragraphStyle(for:)) ?? baseParagraph
         }
-        if style.block == .code {
-            textStorage.addAttribute(.paragraphStyle, value: codeBlockParagraph, range: line)
-        }
+        textStorage.addAttribute(.paragraphStyle, value: paragraph, range: line)
     }
 
-    /// Every other line's paragraph: the Line spacing setting.
+    /// The space between a code block and the line above it, in points. `EditorTextView` draws
+    /// the block this far below its first line's top.
+    var codeBlockMargin: CGFloat {
+        (Self.codeBlockMargin * font.pointSize).rounded()
+    }
+
+    /// Every other line's paragraph.
     private var baseParagraph: NSParagraphStyle {
         if let plainParagraph {
             return plainParagraph
@@ -477,20 +494,34 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     }
 
     private var lineSpacingPoints: CGFloat {
-        let em: CGFloat = switch lineSpacing {
-        case .compact: 0
-        case .comfortable: Self.comfortableLineSpacing
-        }
-        return (em * font.pointSize).rounded()
+        (Self.lineSpacing * font.pointSize).rounded()
     }
 
-    /// Paragraph styles depend on the font and the line spacing: after either changes, they're
-    /// made again and everything restyles.
+    /// Paragraph styles depend on the font: after it changes, they're made again and everything
+    /// restyles.
     private func resetParagraphStyles() {
         paragraphStyles.removeAll()
         codeParagraph = nil
+        fenceParagraphs.removeAll()
         plainParagraph = nil
         restyleAll()
+    }
+
+    /// A hidden fence's paragraph: all hidden characters, which TextKit 2 lays out 0 pt tall, so
+    /// it's given the height of the block's padding, and the opening one the margin above it too.
+    /// The bottom padding is the taller: TextKit 2 puts a paragraph's line spacing above its line,
+    /// so the code's first line has room above it already.
+    private func fenceParagraph(isOpening: Bool) -> NSParagraphStyle {
+        if let cached = fenceParagraphs[isOpening] {
+            return cached
+        }
+        let padding = (isOpening ? Self.codeBlockTopPadding : Self.codeBlockBottomPadding) * font.pointSize
+        let height = (padding.rounded() + (isOpening ? codeBlockMargin : 0))
+        let style = NSMutableParagraphStyle()
+        style.minimumLineHeight = height
+        style.maximumLineHeight = height
+        fenceParagraphs[isOpening] = style
+        return style
     }
 
     /// A code block's paragraph: inset from the block drawn behind it.
@@ -597,13 +628,15 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             return nil
         }
         let block = codeBlocks[low - 1]
-        return location == block.openingFence.location || location == block.closingFence?.location ? .fence : .code
+        return location == block.openingFence.location || location == block.closingFence?.location ? .fence(block) : .code
     }
 
     private func attributes(for traits: Traits, headingLevel: Int?) -> [NSAttributedString.Key: Any] {
         if traits.contains(.hidden) {
             // Takes (almost) no space and draws nothing; no underline, strikethrough or background.
-            return [.font: Self.hiddenFont, .foregroundColor: NSColor.clear]
+            // A code span's padding backtick is as wide as the padding instead. Not a kern: TextKit 2
+            // puts the caret, and so the box's edge, halfway through one, and drops one at a line's end.
+            return [.font: traits.contains(.codePadding) ? Self.codePaddingFont : Self.hiddenFont, .foregroundColor: NSColor.clear]
         }
         var attributes: [NSAttributedString.Key: Any] = [.font: font(for: traits, headingLevel: headingLevel), .foregroundColor: NSColor.labelColor]
         if traits.contains(.strikethrough) {
@@ -654,12 +687,33 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
     /// `#` to `######` in em of the editor's font: Obsidian's default heading sizes.
     private static let headingScales: [CGFloat] = [1.802, 1.602, 1.424, 1.266, 1.125, 1]
-    /// The space Comfortable adds after each line, in em: 4 pt at the default 15 pt.
-    private static let comfortableLineSpacing: CGFloat = 0.25
+    /// The space added after each line, in em: 5 pt at the default 15 pt, Obsidian's line height
+    /// (`context/ui/line-spacing-ref.png`).
+    private static let lineSpacing: CGFloat = 0.35
     /// How far a code block's text sits inside the block drawn behind it, in em.
     private static let codeBlockInset: CGFloat = 1
+    /// The height hidden fences keep above and below a code block's text, in em, and the space
+    /// between a block and the line above it, measured from Obsidian (`line-spacing-ref.png`).
+    private static let codeBlockTopPadding: CGFloat = 0.3
+    private static let codeBlockBottomPadding: CGFloat = 0.8
+    private static let codeBlockMargin: CGFloat = 0.25
 
     private static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
+
+    /// The padding either side of an inline code span's text, inside the box `EditorTextView`
+    /// draws around it: the width of a backtick in `codePaddingFont`, about 3 pt.
+    static let inlineCodePadding = backtickWidth(in: codePaddingFont)
+
+    /// A backtick in it is about 3 pt wide. Not exactly: the system font's tracking varies by size.
+    private static let codePaddingFont: NSFont = {
+        let size: CGFloat = 10
+        return NSFont.systemFont(ofSize: size * 3 / backtickWidth(in: .systemFont(ofSize: size)))
+    }()
+
+    private static func backtickWidth(in font: NSFont) -> CGFloat {
+        let backtick = NSAttributedString(string: "`", attributes: [.font: font])
+        return CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(backtick), nil, nil, nil))
+    }
 
     /// No tab stops and a 0.001 pt interval: a tab takes (almost) no space, so hidden indentation
     /// doesn't push an item's text or its revealed marker (T18 spike).
@@ -689,6 +743,9 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         static let heading = Traits(rawValue: 1 << 9)
         /// A code block's line, fences included: monospaced, its background drawn by the editor.
         static let codeBlock = Traits(rawValue: 1 << 10)
+        /// The last backtick of an inline code span's marker: hidden, it still takes the width of
+        /// the padding of the box drawn around the span's text.
+        static let codePadding = Traits(rawValue: 1 << 11)
     }
 
     private struct FontKey: Hashable {
@@ -700,15 +757,17 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// What a line is, block-wise: a heading, a code block's fence, or a line inside one.
     private enum LineBlock {
         case heading(MarkdownHeading)
-        case fence
+        case fence(MarkdownCodeBlock)
         case code
     }
 
     /// A line's block layout, compared to skip unchanged lines.
     private enum BlockStyle: Hashable {
         case heading(level: Int)
-        /// A fence or a line inside a code block.
+        /// A shown fence or a line inside a code block.
         case code
+        /// A fence while the selection isn't in its block: the block's padding.
+        case hiddenFence(isOpening: Bool)
     }
 
     /// An item line's layout: its level and kind, and its raw marker if it's revealed.
