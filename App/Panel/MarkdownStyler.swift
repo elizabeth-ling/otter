@@ -609,9 +609,6 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         if traits.contains(.strikethrough) {
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
         }
-        if traits.contains(.code) {
-            attributes[.backgroundColor] = NSColor.quaternarySystemFill
-        }
         if traits.contains(.link) {
             attributes[.foregroundColor] = NSColor.linkColor
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
@@ -660,7 +657,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     /// The space Comfortable adds after each line, in em: 4 pt at the default 15 pt.
     private static let comfortableLineSpacing: CGFloat = 0.25
     /// How far a code block's text sits inside the block drawn behind it, in em.
-    private static let codeBlockInset: CGFloat = 0.5
+    private static let codeBlockInset: CGFloat = 1
 
     private static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 

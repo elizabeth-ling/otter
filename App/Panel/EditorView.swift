@@ -828,6 +828,7 @@ final class EditorTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         // Under the text: the view doesn't draw its background, so nothing covers these.
         drawCodeBlockBackgrounds(in: dirtyRect)
+        drawInlineCodeBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
         for marker in listMarkers(in: dirtyRect) {
             draw(marker)
@@ -880,14 +881,64 @@ final class EditorTextView: NSTextView {
             return true
         }
         let width = textContainer?.size.width ?? bounds.width
-        NSColor.quaternarySystemFill.setFill()
         for extent in extents.values {
             let block = NSRect(x: origin.x, y: extent.minY, width: width, height: extent.maxY - extent.minY)
-            NSBezierPath(roundedRect: block, xRadius: Self.codeBlockRadius, yRadius: Self.codeBlockRadius).fill()
+            drawCodeBox(block, radius: Self.codeBlockRadius)
         }
     }
 
-    private static let codeBlockRadius: CGFloat = 4
+    private static let codeBlockRadius: CGFloat = 6
+
+    /// A faint rounded box behind each inline code span's text in `rect`, one per line it wraps
+    /// onto, a little wider than the text so it doesn't touch the box's edges. It's sized from the
+    /// code font around the baseline, not the line, so the line spacing doesn't stretch it.
+    private func drawInlineCodeBackgrounds(in rect: NSRect) {
+        guard let styler, let layoutManager = textLayoutManager, let content = layoutManager.textContentManager, let textStorage else {
+            return
+        }
+        let origin = textContainerOrigin
+        let documentStart = content.documentRange.location
+        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
+        let bottom = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: rect.maxY - origin.y))?.rangeInElement.endLocation ?? content.documentRange.endLocation
+        let visible = NSRange(
+            location: content.offset(from: documentStart, to: top),
+            length: content.offset(from: top, to: bottom)
+        )
+        for span in styler.currentSpans() where span.kind == .code && span.contentRange.length > 0 {
+            guard NSIntersectionRange(span.contentRange, visible).length > 0,
+                  let font = textStorage.attribute(.font, at: span.contentRange.location, effectiveRange: nil) as? NSFont,
+                  let start = content.location(documentStart, offsetBy: span.contentRange.location),
+                  let end = content.location(start, offsetBy: span.contentRange.length),
+                  let range = NSTextRange(location: start, end: end)
+            else {
+                continue
+            }
+            layoutManager.enumerateTextSegments(in: range, type: .standard, options: .rangeNotRequired) { _, frame, baseline, _ in
+                let baselineY = origin.y + frame.minY + baseline
+                let box = NSRect(
+                    x: origin.x + frame.minX - Self.inlineCodePadding.width,
+                    y: baselineY - font.ascender - Self.inlineCodePadding.height,
+                    width: frame.width + 2 * Self.inlineCodePadding.width,
+                    height: font.ascender - font.descender + 2 * Self.inlineCodePadding.height
+                )
+                drawCodeBox(box, radius: Self.inlineCodeRadius)
+                return true
+            }
+        }
+    }
+
+    private static let inlineCodePadding = CGSize(width: 3, height: 1)
+    private static let inlineCodeRadius: CGFloat = 4
+
+    /// A code box: a faint fill inside a hairline border, its stroke kept inside `rect`.
+    private func drawCodeBox(_ rect: NSRect, radius: CGFloat) {
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
+        path.lineWidth = 1
+        NSColor.quinarySystemFill.setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.stroke()
+    }
 
     // MARK: Bullets and checkboxes (ADR-017, ADR-018)
 

@@ -91,7 +91,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | `*italic*`, `_italic_` | *italic* |
 | `***both***`, `**_both_**` | bold italic |
 | `~~struck~~` | struck through |
-| `` `code` `` (any run of backticks) | `code` in the monospaced system font at the editor's size, faint background (`quaternarySystemFill`) over the code only |
+| `` `code` `` (any run of backticks) | `code` in the monospaced system font at the editor's size, on a faint rounded box (`quinarySystemFill`, a hairline `separatorColor` border, 4 pt corners) around the code only, one per line it wraps onto |
 | `[text](url)` | `text` in the link colour, underlined; the URL shows as a tooltip on hover. Not clickable: a click places the caret |
 
 **What's styled**
@@ -159,7 +159,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | Markdown | Shown as |
 |---|---|
 | `# Title` … `###### Title`, at a line's start | Bold, at Obsidian's sizes: 1.802, 1.602, 1.424, 1.266, 1.125 and 1 em of the editor's font |
-| ```` ``` ```` (or `~~~`) lines and everything between | Monospaced (the editor's font if it's monospaced already) on a faint rounded block (`quaternarySystemFill`) the width of the text, the text inset 0.5 em; the fence lines, info string included, in `tertiaryLabelColor` |
+| ```` ``` ```` (or `~~~`) lines and everything between | Monospaced (the editor's font if it's monospaced already) on a faint rounded block (`quinarySystemFill`, a hairline `separatorColor` border, 6 pt corners) the width of the text, the text inset 1 em; the fence lines, info string included, in `tertiaryLabelColor` |
 
 - A heading needs up to three spaces, one to six `#`s, then a space or tab: `#tag`, a lone `#`, `####### x` and a 4-space-indented `#` show as typed. Inline styles work inside a heading; a closing run of `#`s is part of its text.
 - A heading's `#`s and the spaces after them show, dimmed, while the caret is on its line or a selection touches it, and hide on every other line, as in Obsidian. A heading with no text yet (`# `) always shows them. Caret, `⌫`, `↩` and copy treat them as plain text, since they're only hidden when the caret is elsewhere.
