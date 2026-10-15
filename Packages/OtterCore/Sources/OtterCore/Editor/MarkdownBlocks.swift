@@ -101,6 +101,29 @@ public enum MarkdownBlocks {
         return blocks
     }
 
+    /// After typing with the caret at `caret`: if that completed a bare ```` ``` ```` or `~~~`
+    /// opening fence, with nothing after it on its line, and a block is left unclosed (its own, or
+    /// one below whose fences it paired up differently), the edit that adds a matching closing
+    /// fence on the next line, so no block runs to the end of the note. The caret stays after the
+    /// opening fence, for an info string. `nil` otherwise.
+    public static func closingFence(completedAt caret: Int, in text: String) -> MarkdownEdit? {
+        let blocks = codeBlocks(in: text)
+        guard blocks.last?.closingFence == nil, let block = blocks.first(where: { NSMaxRange($0.openingFence) == caret }) else {
+            return nil
+        }
+        let line = (text as NSString).substring(with: block.openingFence)
+        let indent = line.prefix { $0 == " " }
+        let fence = line.dropFirst(indent.count)
+        guard fence == "```" || fence == "~~~" else {
+            return nil
+        }
+        return MarkdownEdit(
+            range: NSRange(location: caret, length: 0),
+            replacement: "\n" + indent + fence,
+            selection: NSRange(location: caret, length: 0)
+        )
+    }
+
     private static func heading(on line: MarkdownLines.Line, in characters: [unichar]) -> MarkdownHeading? {
         var index = line.start
         while index < line.end, index - line.start < 3, characters[index] == space {

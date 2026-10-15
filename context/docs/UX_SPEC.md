@@ -164,6 +164,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 - A heading needs up to three spaces, one to six `#`s, then a space or tab: `#tag`, a lone `#`, `####### x` and a 4-space-indented `#` show as typed. Inline styles work inside a heading; a closing run of `#`s is part of its text.
 - A heading's `#`s and the spaces after them show, dimmed, while the caret is on its line or a selection touches it, and hide on every other line, as in Obsidian. A heading with no text yet (`# `) always shows them. Caret, `⌫`, `↩` and copy treat them as plain text, since they're only hidden when the caret is elsewhere.
 - A fence closes with the same marker, at least as many, and nothing after but spaces (CommonMark). Until then the block runs to the end of the note, as in Obsidian. Fences show as typed; nothing in a code block hides.
+- Typing a bare ```` ``` ```` or `~~~` opening fence (up to three spaces, then exactly three markers, nothing after) adds its closing fence on the next line, with the same indentation, whenever a block would otherwise be left unclosed, so it never fills the rest of the panel. The caret stays after the opening fence, for an info string; `⌘Z` removes the closing fence first. A fence that's already closed, or that closes a block, adds nothing.
 
 ## 2. Keyboard map
 

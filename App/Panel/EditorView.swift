@@ -720,11 +720,27 @@ final class EditorTextView: NSTextView {
             }
             return
         }
+        if typed.hasSuffix("`") || typed.hasSuffix("~"), closeCodeBlock() {
+            return
+        }
         let inserted = NSRange(location: target.location, length: (typed as NSString).length)
         if inserted.length > 0, let caret = hiddenMarkerRules()?.caretAfterClosingMarker(completedBy: inserted) {
             pinnedCaret = caret
             setSelectedRange(NSRange(location: caret, length: 0))
         }
+    }
+
+    /// Typing a code block's opening fence adds its closing fence below, as its own `⌘Z` step, so
+    /// the unclosed block doesn't fill the rest of the panel. Whether it did.
+    private func closeCodeBlock() -> Bool {
+        let selection = selectedRange()
+        guard selection.length == 0, let edit = MarkdownBlocks.closingFence(completedAt: selection.location, in: string) else {
+            return false
+        }
+        breakUndoCoalescing()
+        apply(edit, actionName: nil)
+        breakUndoCoalescing()
+        return true
     }
 
     override func unmarkText() {
@@ -860,9 +876,10 @@ final class EditorTextView: NSTextView {
         let origin = textContainerOrigin
         let documentStart = content.documentRange.location
         let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
-        // Each block's extent in this rect; one cut off by the rect runs past it, so the corners
-        // are only drawn where the block really starts and ends.
-        var extents: [Int: (minY: CGFloat, maxY: CGFloat)] = [:]
+        // Each block's extent in this rect, from its first fragment here to its last, and whether
+        // those are where the block starts and ends. One cut off by the rect runs past it, so the
+        // corners are only drawn where the block really starts and ends.
+        var extents: [Int: (minY: CGFloat, maxY: CGFloat, starts: Bool, ends: Bool)] = [:]
         layoutManager.enumerateTextLayoutFragments(from: top, options: [.ensuresLayout]) { fragment in
             let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
             guard frame.minY <= rect.maxY else {
@@ -874,15 +891,19 @@ final class EditorTextView: NSTextView {
                 return true
             }
             let block = blocks[index]
-            let minY = start == block.range.location ? frame.minY : rect.minY - Self.codeBlockRadius
-            let maxY = end >= NSMaxRange(block.range) ? frame.maxY : rect.maxY + Self.codeBlockRadius
-            let extent = extents[index]
-            extents[index] = (min(extent?.minY ?? minY, minY), max(extent?.maxY ?? maxY, maxY))
+            let ends = end >= NSMaxRange(block.range)
+            if let extent = extents[index] {
+                extents[index] = (extent.minY, frame.maxY, extent.starts, ends)
+            } else {
+                extents[index] = (frame.minY, frame.maxY, start == block.range.location, ends)
+            }
             return true
         }
         let width = textContainer?.size.width ?? bounds.width
         for extent in extents.values {
-            let block = NSRect(x: origin.x, y: extent.minY, width: width, height: extent.maxY - extent.minY)
+            let minY = extent.starts ? extent.minY : rect.minY - Self.codeBlockRadius
+            let maxY = extent.ends ? extent.maxY : rect.maxY + Self.codeBlockRadius
+            let block = NSRect(x: origin.x, y: minY, width: width, height: maxY - minY)
             drawCodeBox(block, radius: Self.codeBlockRadius)
         }
     }

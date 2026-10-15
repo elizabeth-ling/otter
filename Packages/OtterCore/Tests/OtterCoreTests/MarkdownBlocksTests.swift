@@ -98,3 +98,44 @@ func theseAreNotHeadings(text: String) {
 @Test func inlineBackticksArentACodeBlock() {
     #expect(codeBlocks("```code``` on one line\n`a`").isEmpty)
 }
+
+// MARK: - Closing fences
+
+/// The text after typing ends at `‸`, with the closing fence added, or `nil` when none is.
+private func closingFence(_ marked: String) -> String? {
+    let caret = (marked as NSString).range(of: "‸").location
+    let text = marked.replacingOccurrences(of: "‸", with: "")
+    guard let edit = MarkdownBlocks.closingFence(completedAt: caret, in: text) else {
+        return nil
+    }
+    let edited = (text as NSString).replacingCharacters(in: edit.range, with: edit.replacement) as NSString
+    return edited.replacingCharacters(in: edit.selection, with: "‸")
+}
+
+@Test(arguments: [
+    ("```‸", "```‸\n```"),
+    ("~~~‸", "~~~‸\n~~~"),
+    ("a\n```‸\nb", "a\n```‸\n```\nb"),
+    ("  ```‸", "  ```‸\n  ```"),
+    // Above a block, the new fence would pair with its opening one and leave its closing one open.
+    ("```‸\n```\na\n```", "```‸\n```\n```\na\n```"),
+])
+func typingAnOpeningFenceAddsItsClosingFence(marked: String, expected: String) {
+    #expect(closingFence(marked) == expected)
+}
+
+@Test(arguments: [
+    "``‸",
+    "````‸",
+    "```swift‸",
+    "```‸ x",
+    "a ```‸",
+    "    ```‸",
+    // A closing fence.
+    "```\na\n```‸",
+    // Already closed below.
+    "```‸\na\n```",
+])
+func noClosingFenceIsAdded(marked: String) {
+    #expect(closingFence(marked) == nil)
+}
