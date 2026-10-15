@@ -844,6 +844,7 @@ final class EditorTextView: NSTextView {
         drawCodeBlockBackgrounds(in: dirtyRect)
         drawInlineCodeBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
+        drawMisspellings(in: dirtyRect)
         for marker in listMarkers(in: dirtyRect) {
             draw(marker)
         }
@@ -959,6 +960,77 @@ final class EditorTextView: NSTextView {
         NSColor.separatorColor.setStroke()
         path.stroke()
     }
+
+    // MARK: Misspellings
+
+    /// Marks misspelled words for `drawMisspellings(in:)` instead of macOS's own dots. AppKit
+    /// still marks and clears them as usual: it only clears where its spelling state is set, so
+    /// that's kept, with a value it counts as set but doesn't draw. Grammar keeps macOS's look.
+    override func setSpellingState(_ value: Int, range charRange: NSRange) {
+        super.setSpellingState(value, range: charRange)
+        guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager,
+              let start = content.location(content.documentRange.location, offsetBy: charRange.location),
+              let end = content.location(start, offsetBy: charRange.length),
+              let range = NSTextRange(location: start, end: end)
+        else {
+            return
+        }
+        if value == NSAttributedString.SpellingState.spelling.rawValue {
+            layoutManager.addRenderingAttribute(.spellingState, value: Self.undrawnSpellingState, for: range)
+            layoutManager.addRenderingAttribute(Self.misspelledKey, value: true, for: range)
+        } else {
+            layoutManager.removeRenderingAttribute(Self.misspelledKey, for: range)
+        }
+    }
+
+    private static let misspelledKey = NSAttributedString.Key("OtterMisspelled")
+    /// A spelling state bit macOS doesn't use.
+    private static let undrawnSpellingState = 1 << 8
+
+    /// A row of red dots under each misspelled word in `rect`, a little smaller than macOS's (3 pt
+    /// on a 4 pt pitch) so they're quieter, and centred where macOS's are, just under the baseline.
+    private func drawMisspellings(in rect: NSRect) {
+        guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else {
+            return
+        }
+        let origin = textContainerOrigin
+        let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? content.documentRange.location
+        let bottom = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: rect.maxY - origin.y))?.rangeInElement.endLocation ?? content.documentRange.endLocation
+        var misspellings: [NSTextRange] = []
+        layoutManager.enumerateRenderingAttributes(from: top, reverse: false) { _, attributes, range in
+            guard range.location.compare(bottom) == .orderedAscending else {
+                return false
+            }
+            if attributes[Self.misspelledKey] != nil {
+                misspellings.append(range)
+            }
+            return true
+        }
+        guard !misspellings.isEmpty else {
+            return
+        }
+        let diameter = Self.misspellingDotDiameter
+        let pitch = Self.misspellingDotPitch
+        NSColor.systemRed.withAlphaComponent(0.75).setFill()
+        for range in misspellings {
+            layoutManager.enumerateTextSegments(in: range, type: .standard, options: .rangeNotRequired) { _, frame, baseline, _ in
+                // As many dots as fit the word, centred under it.
+                let count = max(1, Int(frame.width / pitch))
+                let firstMidX = origin.x + frame.midX - CGFloat(count - 1) * pitch / 2
+                let minY = origin.y + frame.minY + baseline + (Self.macOSDotDiameter - diameter) / 2
+                for index in 0..<count {
+                    let midX = firstMidX + CGFloat(index) * pitch
+                    NSBezierPath(ovalIn: NSRect(x: midX - diameter / 2, y: minY, width: diameter, height: diameter)).fill()
+                }
+                return true
+            }
+        }
+    }
+
+    private static let misspellingDotDiameter: CGFloat = 2
+    private static let misspellingDotPitch: CGFloat = 3
+    /// Keeps the smaller dots centred where macOS's are.
+    private static let macOSDotDiameter: CGFloat = 3
 
     // MARK: Bullets and checkboxes (ADR-017, ADR-018)
 
