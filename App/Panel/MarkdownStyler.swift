@@ -620,7 +620,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             attributes[.foregroundColor] = NSColor.secondaryLabelColor
         }
         if traits.contains(.marker) {
-            attributes[.foregroundColor] = NSColor.tertiaryLabelColor
+            attributes[.foregroundColor] = NSColor.dimmedLabel
         }
         if traits.contains(.checked) {
             attributes[.foregroundColor] = NSColor.secondaryLabelColor

@@ -99,7 +99,7 @@ final class PanelContentView: NSVisualEffectView {
             return
         }
         footerLabel.stringValue = warning ?? Self.footerHints
-        footerLabel.textColor = warning == nil ? .tertiaryLabelColor : .systemOrange
+        footerLabel.textColor = warning == nil ? .dimmedLabel : .systemOrange
         footerLabel.lineBreakMode = warning == nil ? .byTruncatingHead : .byTruncatingTail
         footerLabel.toolTip = warning
         if let warning {
@@ -159,7 +159,7 @@ final class PanelContentView: NSVisualEffectView {
 
         let hints = footerLabel
         hints.font = .systemFont(ofSize: 11)
-        hints.textColor = .tertiaryLabelColor
+        hints.textColor = .dimmedLabel
         hints.lineBreakMode = .byTruncatingHead
         hints.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         hints.translatesAutoresizingMaskIntoConstraints = false

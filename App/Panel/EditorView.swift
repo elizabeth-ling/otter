@@ -837,7 +837,7 @@ final class EditorTextView: NSTextView {
         }
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font ?? .systemFont(ofSize: 15),
-            .foregroundColor: NSColor.placeholderTextColor,
+            .foregroundColor: NSColor.dimmedLabel,
         ]
         let padding = textContainer?.lineFragmentPadding ?? 0
         let origin = NSPoint(x: textContainerOrigin.x + padding, y: textContainerOrigin.y)
@@ -962,7 +962,7 @@ final class EditorTextView: NSTextView {
             let em = styler.font.pointSize
             let center = CGPoint(x: marker.levelStart + Self.markerCenterOffset * em, y: marker.baseline - styler.font.xHeight / 2)
             let diameter = Self.bulletDiameter * em
-            NSColor.tertiaryLabelColor.setFill()
+            NSColor.dimmedLabel.setFill()
             NSBezierPath(ovalIn: NSRect(x: center.x - diameter / 2, y: center.y - diameter / 2, width: diameter, height: diameter)).fill()
         case let .task(checked):
             let circle = circleRect(for: marker)
@@ -982,7 +982,7 @@ final class EditorTextView: NSTextView {
             } else {
                 let ring = NSBezierPath(ovalIn: circle.insetBy(dx: 0.5, dy: 0.5))
                 ring.lineWidth = 1
-                NSColor.tertiaryLabelColor.setStroke()
+                NSColor.dimmedLabel.setStroke()
                 ring.stroke()
             }
         }
