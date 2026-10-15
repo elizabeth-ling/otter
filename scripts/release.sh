@@ -94,6 +94,7 @@ notarize() {
 
 NOTES="$(release_notes)"
 [[ -n "$NOTES" ]] || fail "CHANGELOG.md has no '## [$VERSION]' section"
+command -v dmgbuild >/dev/null || fail "dmgbuild isn't installed; run 'pip install dmgbuild'"
 
 if ! $LOCAL; then
     [[ -n "${DEVELOPMENT_TEAM:-}" ]] || fail "set DEVELOPMENT_TEAM to the Developer ID team's ID"
@@ -182,12 +183,8 @@ fi
 # --- 4. DMG -------------------------------------------------------------------------------------
 
 step "Building $(basename "$DMG")"
-STAGING="$OUT/dmg"
-mkdir -p "$STAGING"
-ditto "$APP" "$STAGING/Otter.app"
-ln -s /Applications "$STAGING/Applications"
-hdiutil create -volname Otter -srcfolder "$STAGING" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
-rm -rf "$STAGING"
+# The window's layout and background are in scripts/dmg-settings.py.
+dmgbuild -s scripts/dmg-settings.py -D app="$APP" Otter "$DMG"
 
 if ! $LOCAL; then
     codesign --sign "$IDENTITY" --timestamp "$DMG"

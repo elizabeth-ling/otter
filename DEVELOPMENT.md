@@ -68,11 +68,14 @@ Never commit `.p12`, `.p8` or Sparkle key files.
 ### building a release locally
 
 ```sh
+pip install dmgbuild                              # once; lays out the DMG window
 xcrun notarytool store-credentials otter-notary   # once
 DEVELOPMENT_TEAM=XXXXXXXXXX NOTARY_KEYCHAIN_PROFILE=otter-notary scripts/release.sh 0.1.1
 ```
 
 `scripts/release.sh --local 0.1.1` skips Developer ID signing and notarization (ad-hoc signed), to try the script on a Mac without the certificate.
+
+The DMG window's layout is in [`scripts/dmg-settings.py`](scripts/dmg-settings.py).
 
 ### testing an update before a public release
 
