@@ -59,6 +59,7 @@ The `●` in the header is the destination dot (colored per destination), next t
 | Background | Vibrancy (`NSVisualEffectView`, `.popover`/`.hudWindow` material), thin 0.5 pt separator-color border, system shadow |
 | Stacking | Floats above all normal app windows, including full-screen apps, on whichever Space you're on |
 | Font | System font, 15 pt (setting: system / monospaced, size) |
+| Line spacing | Comfortable (default) adds 0.25 em after each line; Compact is the font's own line height (setting) |
 | Placeholder | "Jot something down…" |
 | Chrome | No title bar, no traffic lights. Dragged by the header strip or footer background; dragging in the text selects text |
 | Animation | 80 ms fade-in/out; none if Reduce Motion is on |
@@ -97,8 +98,8 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 - Styles combine: bold inside a link, struck-through italic. Nothing inside inline code is styled.
 - Rules follow CommonMark/GFM as Obsidian renders them, within one line: a span never crosses a line break; `\*` is a literal `*` (the backslash stays visible); `_` doesn't open or close inside a word (`snake_case_name` stays plain); an unclosed marker, or one with a space just inside (`** x **`), is plain text.
-- Lines inside a fenced code block (```` ``` ```` or `~~~`) aren't styled.
-- Not styled, shown as typed: headings, `*` / `+` bullets and numbered lists, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML. `- ` bullets and `- [ ]` tasks are covered under Lists and tasks below.
+- Lines inside a fenced code block (```` ``` ```` or `~~~`) get no inline styles; the block is styled as a whole (Headings and code blocks below).
+- Not styled, shown as typed: `*` / `+` bullets and numbered lists, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML. `- ` bullets and `- [ ]` tasks are covered under Lists and tasks below.
 - Follows the Font setting (§5): bold and italic are faces of the chosen font; with Monospaced, inline code keeps only its background.
 
 **When markers hide**
@@ -150,6 +151,19 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 - `Tab` / `⇧Tab` in an item indent it under the item above / outdent it back to its parent's indentation, using tab characters. Elsewhere `Tab` still inserts a tab.
 - Clicking a drawn circle ticks or unticks it, writing `[x]` or `[ ]`, without moving the caret, on any line. A revealed raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it. Each list action is one `⌘Z` step.
 - Paste inserts text as it does now and never adds markers. Copying across lines includes the markers. While an input method is composing, `↩` and `Tab` go to it.
+
+### Headings and code blocks
+
+`#` headings and fenced code blocks are styled as blocks, and the note stays plain Markdown (ADR-020).
+
+| Markdown | Shown as |
+|---|---|
+| `# Title` … `###### Title`, at a line's start | Bold, at Obsidian's sizes: 1.802, 1.602, 1.424, 1.266, 1.125 and 1 em of the editor's font |
+| ```` ``` ```` (or `~~~`) lines and everything between | Monospaced (the editor's font if it's monospaced already) on a faint rounded block (`quaternarySystemFill`) the width of the text, the text inset 0.5 em; the fence lines, info string included, in `tertiaryLabelColor` |
+
+- A heading needs up to three spaces, one to six `#`s, then a space or tab: `#tag`, a lone `#`, `####### x` and a 4-space-indented `#` show as typed. Inline styles work inside a heading; a closing run of `#`s is part of its text.
+- A heading's `#`s and the spaces after them show, dimmed, while the caret is on its line or a selection touches it, and hide on every other line, as in Obsidian. A heading with no text yet (`# `) always shows them. Caret, `⌫`, `↩` and copy treat them as plain text, since they're only hidden when the caret is elsewhere.
+- A fence closes with the same marker, at least as many, and nothing after but spaces (CommonMark). Until then the block runs to the end of the note, as in Obsidian. Fences show as typed; nothing in a code block hides.
 
 ## 2. Keyboard map
 
@@ -246,6 +260,7 @@ The tabs sit in a centred preference-style toolbar, each an icon over its name; 
 - Launch at login: shows the login item as macOS has it. While macOS waits for approval, "Approve in System Settings › General › Login Items." with an **Open Login Items** button
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
+- Line spacing: Comfortable (default) / Compact
 - Smart quotes and dashes (off by default — notes often contain code)
 - Reset panel position and size
 - A **Shortcuts…** button that goes to the Shortcuts tab

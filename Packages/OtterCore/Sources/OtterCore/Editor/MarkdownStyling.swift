@@ -542,8 +542,9 @@ private struct InlineParser {
 
 // MARK: - Lines and fences
 
-/// The text's lines, and which are outside fenced code blocks. Shared by `MarkdownStyling` and
-/// `MarkdownLists`, so inline styles and list items agree on what's in a fence.
+/// The text's lines, and which are outside fenced code blocks. Shared by `MarkdownStyling`,
+/// `MarkdownLists` and `MarkdownBlocks`, so inline styles, list items and blocks agree on what's in
+/// a fence.
 struct MarkdownLines {
     struct Line {
         /// The line's first character.
@@ -554,6 +555,8 @@ struct MarkdownLines {
         let next: Int
         /// Outside a fenced code block, and not a fence's own line.
         let isProse: Bool
+        /// A fence's own line, opening or closing.
+        let isFence: Bool
     }
 
     let characters: [unichar]
@@ -568,22 +571,25 @@ struct MarkdownLines {
                 lineEnd += 1
             }
             var isProse = false
+            var isFence = false
             if let open = fence {
                 if closesFence(open, from: lineStart, to: lineEnd) {
                     fence = nil
+                    isFence = true
                 }
             } else if let open = opensFence(from: lineStart, to: lineEnd) {
                 fence = open
+                isFence = true
             } else {
                 isProse = true
             }
             guard lineEnd < characters.count else {
-                body(Line(start: lineStart, end: lineEnd, next: lineEnd, isProse: isProse))
+                body(Line(start: lineStart, end: lineEnd, next: lineEnd, isProse: isProse, isFence: isFence))
                 break
             }
             let isCRLF = characters[lineEnd] == cr && lineEnd + 1 < characters.count && characters[lineEnd + 1] == lf
             let next = lineEnd + (isCRLF ? 2 : 1)
-            body(Line(start: lineStart, end: lineEnd, next: next, isProse: isProse))
+            body(Line(start: lineStart, end: lineEnd, next: next, isProse: isProse, isFence: isFence))
             lineStart = next
         }
     }
