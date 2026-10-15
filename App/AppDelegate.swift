@@ -22,8 +22,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Builds the capture pipeline before `applicationDidFinishLaunching`, so it already exists when
     /// the panel (T03) and the clipboard hotkey (T11) are wired to it there. It's cheap: no disk work,
-    /// and the first outbox drain waits 1 s.
+    /// and the first outbox drain waits 1 s. If another Otter is running, hands off to it instead and
+    /// builds nothing, so `applicationDidFinishLaunching` returns straight away.
     func applicationWillFinishLaunching(_ notification: Notification) {
+        #if OTTER_TEST_HOOKS
+        // A test-hook run has its own files and preferences, so it can run next to the user's Otter.
+        let mayRunTwice = testHooks != nil
+        #else
+        let mayRunTwice = false
+        #endif
+        if !mayRunTwice, let copy = SingleInstance.runningCopy() {
+            SingleInstance.handOff(to: copy)
+            return
+        }
+
         #if OTTER_TEST_HOOKS
         let pipeline = testHooks.map { CapturePipeline(defaults: $0.defaults, documents: $0.documents) } ?? CapturePipeline()
         #else

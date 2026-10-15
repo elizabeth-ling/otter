@@ -238,15 +238,23 @@ Clicking a recent item opens it where it lives: `obsidian://open` when the note 
 
 The waiting row counts every note in the outbox; clicking it retries them all now, like Settings › Advanced › Retry Now. The amber dot appears after 5 failures in a row for one destination (ARCHITECTURE §4 rule 5), with one notification, "1 note couldn't be delivered to {destination}", that never includes note text; clicking it opens Settings › Advanced. The dot and notification go once the notes are delivered.
 
-## 5. Settings (one window, three tabs)
+## 5. Settings (one window, four tabs)
+
+The tabs sit in a centred preference-style toolbar, each an icon over its name; the window is titled after the tab shown.
 
 **General**
-- Open-panel hotkey · Save-clipboard hotkey
 - Launch at login: shows the login item as macOS has it. While macOS waits for approval, "Approve in System Settings › General › Login Items." with an **Open Login Items** button
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
 - Smart quotes and dashes (off by default — notes often contain code)
 - Reset panel position and size
+- A **Shortcuts…** button that goes to the Shortcuts tab
+
+**Shortcuts**
+- Open-panel hotkey · Save-clipboard hotkey, each recordable, with the `⌘Space` handoff shown above the list while Spotlight holds it
+- The panel's shortcuts (§2), for reference
+- A search field that matches an action's name or its keys (`⇧⌘O`, `cmd shift o`)
+- **Reset Shortcuts**: both hotkeys back to their defaults (`⌥Space`, none)
 
 **Destinations**
 - List of destinations with drag-to-reorder (order = `⌘1…⌘9`), star = default

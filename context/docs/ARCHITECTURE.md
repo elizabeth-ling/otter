@@ -37,6 +37,7 @@ Otter/
 ├── App/
 │   ├── OtterApp.swift            # @main, NSApplicationDelegateAdaptor
 │   ├── AppDelegate.swift         # wiring, lifecycle
+│   ├── SingleInstance.swift      # a second copy of Otter.app opens the running one and quits (#2)
 │   ├── Hotkeys/HotkeyService.swift, SpotlightShortcutProbe.swift
 │   ├── Panel/CapturePanel.swift  # NSPanel subclass
 │   ├── Panel/PanelController.swift, PanelContentView.swift   # show/hide/position; header, text area, footer (T03, T15)

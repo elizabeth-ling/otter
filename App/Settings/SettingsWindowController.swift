@@ -3,8 +3,10 @@ import Observation
 import SwiftUI
 
 /// The Settings window (T10): SwiftUI in an `NSWindow` Otter controls, built on first use. It's an
-/// ordinary window that activates Otter, since Otter is an agent app (ARCHITECTURE §6). On first
-/// run it shows onboarding instead of the tabs (UX_SPEC §6).
+/// ordinary window that activates Otter, since Otter is an agent app (ARCHITECTURE §6). The tabs
+/// are a preference-style `NSToolbar`, centred with the icon over the label, and the window is
+/// titled after the tab shown. On first run it shows onboarding instead, with the toolbar hidden
+/// (UX_SPEC §6).
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     @MainActor
@@ -15,10 +17,31 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             case onboarding
         }
 
-        enum Tab: Hashable {
+        enum Tab: String, CaseIterable, Hashable {
             case general
+            case shortcuts
             case destinations
             case advanced
+
+            var title: String {
+                switch self {
+                case .general: "General"
+                case .shortcuts: "Shortcuts"
+                case .destinations: "Destinations"
+                case .advanced: "Advanced"
+                }
+            }
+
+            var symbolName: String {
+                switch self {
+                case .general: "gearshape"
+                case .shortcuts: "keyboard"
+                case .destinations: "folder"
+                case .advanced: "slider.horizontal.3"
+                }
+            }
+
+            var toolbarID: NSToolbarItem.Identifier { NSToolbarItem.Identifier(rawValue) }
         }
 
         var mode = Mode.settings
@@ -46,7 +69,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             router.mode = .settings
         }
         if let tab, router.mode == .settings {
-            router.tab = tab
+            select(tab)
         }
         show()
     }
@@ -90,12 +113,28 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - Private
 
+    private func select(_ tab: Router.Tab) {
+        router.tab = tab
+        window?.toolbar?.selectedItemIdentifier = tab.toolbarID
+        updateTitle()
+    }
+
+    @objc private func toolbarItemClicked(_ item: NSToolbarItem) {
+        Router.Tab(rawValue: item.itemIdentifier.rawValue).map(select)
+    }
+
+    private func updateTitle() {
+        window?.title = switch router.mode {
+        case .onboarding: onboarding.isHotkeyOnly ? "Finish Setting Up ⌘Space" : "Welcome to Otter"
+        case .settings: router.tab.title
+        }
+    }
+
     private func show() {
         let window = window ?? makeWindow()
-        window.title = switch router.mode {
-        case .onboarding: onboarding.isHotkeyOnly ? "Finish Setting Up ⌘Space" : "Welcome to Otter"
-        case .settings: "Otter Settings"
-        }
+        window.toolbar?.isVisible = router.mode == .settings
+        window.toolbar?.selectedItemIdentifier = router.tab.toolbarID
+        updateTitle()
         model.window = window
         onboarding.window = window
         model.windowDidOpen()
@@ -107,11 +146,20 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let hosting = NSHostingController(rootView: SettingsRootView(router: router, model: model, onboarding: onboarding))
+        let root = SettingsRootView(router: router, model: model, onboarding: onboarding) { [weak self] tab in
+            self?.select(tab)
+        }
+        let hosting = NSHostingController(rootView: root)
         // The window takes the size of the tab or step shown.
         hosting.sizingOptions = [.preferredContentSize]
         let window = SettingsWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable, .miniaturizable]
+        let toolbar = NSToolbar(identifier: "OtterSettings")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconAndLabel
+        toolbar.allowsUserCustomization = false
+        window.toolbar = toolbar
+        window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         window.delegate = self
         self.window = window
@@ -119,26 +167,56 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 }
 
+// MARK: - NSToolbarDelegate
+
+extension SettingsWindowController: NSToolbarDelegate {
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard let tab = Router.Tab(rawValue: itemIdentifier.rawValue) else {
+            return nil
+        }
+        let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+        item.label = tab.title
+        item.image = NSImage(systemSymbolName: tab.symbolName, accessibilityDescription: nil)
+        item.target = self
+        item.action = #selector(toolbarItemClicked(_:))
+        return item
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        Router.Tab.allCases.map(\.toolbarID)
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+}
+
 private struct SettingsRootView: View {
-    @Bindable var router: SettingsWindowController.Router
+    let router: SettingsWindowController.Router
     let model: SettingsModel
     let onboarding: OnboardingModel
+    let select: (SettingsWindowController.Router.Tab) -> Void
 
     var body: some View {
         switch router.mode {
         case .onboarding:
             OnboardingView(model: onboarding)
         case .settings:
-            TabView(selection: $router.tab) {
-                GeneralSettingsView(model: model)
-                    .tabItem { Label("General", systemImage: "gearshape") }
-                    .tag(SettingsWindowController.Router.Tab.general)
-                DestinationsSettingsView(model: model)
-                    .tabItem { Label("Destinations", systemImage: "folder") }
-                    .tag(SettingsWindowController.Router.Tab.destinations)
-                AdvancedSettingsView(model: model)
-                    .tabItem { Label("Advanced", systemImage: "wrench.and.screwdriver") }
-                    .tag(SettingsWindowController.Router.Tab.advanced)
+            Group {
+                switch router.tab {
+                case .general:
+                    GeneralSettingsView(model: model) { select(.shortcuts) }
+                case .shortcuts:
+                    ShortcutsSettingsView(model: model)
+                case .destinations:
+                    DestinationsSettingsView(model: model)
+                case .advanced:
+                    AdvancedSettingsView(model: model)
+                }
             }
             .frame(width: 700, height: 520)
         }
