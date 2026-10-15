@@ -61,6 +61,13 @@ final class SettingsModel {
         }
     }
 
+    var autocorrect: Bool {
+        didSet {
+            settings.autocorrect = autocorrect
+            panel.applyEditorSettings()
+        }
+    }
+
     /// The login item as macOS has it (T12). Read when the window opens and whenever Otter comes
     /// back to the front, e.g. from approving it in System Settings.
     private(set) var loginItemStatus = SMAppService.Status.notRegistered
@@ -126,6 +133,7 @@ final class SettingsModel {
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
         smartQuotesAndDashes = settings.smartQuotesAndDashes
+        autocorrect = settings.autocorrect
         remembersRecents = settings.remembersRecents
         reloadDestinations()
     }
@@ -393,6 +401,7 @@ final class SettingsModel {
         fontFamily = settings.fontFamily
         fontSize = settings.fontSize
         smartQuotesAndDashes = settings.smartQuotesAndDashes
+        autocorrect = settings.autocorrect
         remembersRecents = settings.remembersRecents
         updates.settingsDidReset()
         automaticallyChecksForUpdates = updates.automaticallyChecksForUpdates

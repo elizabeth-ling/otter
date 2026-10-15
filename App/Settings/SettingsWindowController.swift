@@ -146,9 +146,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let root = SettingsRootView(router: router, model: model, onboarding: onboarding) { [weak self] tab in
-            self?.select(tab)
-        }
+        let root = SettingsRootView(router: router, model: model, onboarding: onboarding)
         let hosting = NSHostingController(rootView: root)
         // The window takes the size of the tab or step shown.
         hosting.sizingOptions = [.preferredContentSize]
@@ -199,7 +197,6 @@ private struct SettingsRootView: View {
     let router: SettingsWindowController.Router
     let model: SettingsModel
     let onboarding: OnboardingModel
-    let select: (SettingsWindowController.Router.Tab) -> Void
 
     var body: some View {
         switch router.mode {
@@ -209,7 +206,7 @@ private struct SettingsRootView: View {
             Group {
                 switch router.tab {
                 case .general:
-                    GeneralSettingsView(model: model) { select(.shortcuts) }
+                    GeneralSettingsView(model: model)
                 case .shortcuts:
                     ShortcutsSettingsView(model: model)
                 case .destinations:

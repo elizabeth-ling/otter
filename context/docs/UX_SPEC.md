@@ -263,8 +263,8 @@ The tabs sit in a centred preference-style toolbar, each an icon over its name; 
 - Close panel when clicking elsewhere
 - Font: System / Monospaced, size
 - Smart quotes and dashes (off by default — notes often contain code)
+- Autocorrect (off by default; misspellings are still underlined)
 - Reset panel position and size
-- A **Shortcuts…** button that goes to the Shortcuts tab
 
 **Shortcuts**
 - Open-panel hotkey · Save-clipboard hotkey, each recordable, with the `⌘Space` handoff shown above the list while Spotlight holds it

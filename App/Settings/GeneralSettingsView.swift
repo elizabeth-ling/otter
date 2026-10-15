@@ -4,7 +4,6 @@ import SwiftUI
 /// Settings › General (UX_SPEC §5). The shortcuts have their own tab.
 struct GeneralSettingsView: View {
     @Bindable var model: SettingsModel
-    let showShortcuts: () -> Void
 
     var body: some View {
         Form {
@@ -39,6 +38,7 @@ struct GeneralSettingsView: View {
                     Text("Smart quotes and dashes")
                     Text("Off by default: notes often contain code.")
                 }
+                Toggle("Autocorrect", isOn: $model.autocorrect)
             }
 
             Section {
@@ -47,9 +47,6 @@ struct GeneralSettingsView: View {
                         model.resetPanelPosition()
                     }
                     .accessibilityLabel("Reset panel position and size")
-                }
-                LabeledContent("Change the shortcuts that open the panel and save your clipboard in Shortcuts.") {
-                    Button("Shortcuts…", action: showShortcuts)
                 }
             }
         }

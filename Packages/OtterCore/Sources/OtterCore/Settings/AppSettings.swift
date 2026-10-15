@@ -16,6 +16,7 @@ public struct AppSettings {
         public static let fontFamily = "editorFontFamily"
         public static let fontSize = "editorFontSize"
         public static let smartQuotesAndDashes = "smartQuotesAndDashes"
+        public static let autocorrect = "autocorrect"
         public static let launchAtLogin = "launchAtLogin"
         public static let remembersRecents = "remembersRecentCaptures"
         public static let hasOnboarded = "hasOnboarded"
@@ -55,6 +56,13 @@ public struct AppSettings {
     public var smartQuotesAndDashes: Bool {
         get { defaults.bool(forKey: Key.smartQuotesAndDashes) }
         nonmutating set { defaults.set(newValue, forKey: Key.smartQuotesAndDashes) }
+    }
+
+    /// macOS's automatic spelling correction. Off by default: it rewrites code and shorthand.
+    /// Misspellings are still underlined either way.
+    public var autocorrect: Bool {
+        get { defaults.bool(forKey: Key.autocorrect) }
+        nonmutating set { defaults.set(newValue, forKey: Key.autocorrect) }
     }
 
     /// On by default (UX_SPEC §6). The user's last choice; the app's `LoginItem` registers it, and

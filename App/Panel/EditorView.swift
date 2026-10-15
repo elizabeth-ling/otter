@@ -70,6 +70,12 @@ final class EditorView: NSScrollView {
         }
     }
 
+    /// "Autocorrect" (UX_SPEC §5). Off by default.
+    var autocorrect: Bool {
+        get { textView.isAutomaticSpellingCorrectionEnabled }
+        set { textView.isAutomaticSpellingCorrectionEnabled = newValue }
+    }
+
     private let styler: MarkdownStyler
 
     init(font: NSFont, inset: CGFloat, placeholder: String) {
@@ -93,6 +99,8 @@ final class EditorView: NSScrollView {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        // Off unless the setting turns it on (`autocorrect`), whatever macOS's own setting is.
+        textView.isAutomaticSpellingCorrectionEnabled = false
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainerInset = NSSize(width: inset, height: inset)
         textView.isVerticallyResizable = true

@@ -25,6 +25,7 @@ private func folderConfig(_ name: String, displayPath: String? = nil, mode: Fold
     #expect(settings.fontFamily == .system)
     #expect(settings.fontSize == 15)
     #expect(settings.smartQuotesAndDashes == false)
+    #expect(settings.autocorrect == false)
     #expect(settings.launchAtLogin == true)
     #expect(settings.remembersRecents == true)
     #expect(settings.hasOnboarded == false)

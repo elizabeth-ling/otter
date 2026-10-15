@@ -270,7 +270,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// The Font and "Smart quotes and dashes" settings, read now. Settings calls this
+    /// The Font, "Smart quotes and dashes" and "Autocorrect" settings, read now. Settings calls this
     /// on a change.
     func applyEditorSettings() {
         let size = CGFloat(settings.fontSize)
@@ -282,6 +282,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             content.editor.font = font
         }
         content.editor.smartQuotesAndDashes = settings.smartQuotesAndDashes
+        content.editor.autocorrect = settings.autocorrect
     }
 
     /// Writes the draft to disk before the app quits.
