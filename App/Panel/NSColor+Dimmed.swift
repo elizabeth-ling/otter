@@ -7,4 +7,9 @@ extension NSColor {
     static let dimmedLabel = NSColor(name: "dimmedLabel") { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .secondaryLabelColor : .tertiaryLabelColor
     }
+
+    /// Code's text: a little greyer than the label colour, to set it apart from the text around it.
+    static let codeLabel = NSColor(name: "codeLabel") { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.7) : NSColor(white: 0, alpha: 0.7)
+    }
 }

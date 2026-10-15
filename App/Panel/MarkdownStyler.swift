@@ -640,8 +640,11 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         }
         let font = font(for: traits, headingLevel: headingLevel)
         var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
-        if !traits.isDisjoint(with: [.code, .codeBlock]), !self.font.isFixedPitch {
-            attributes[.kern] = Self.codeTracking * font.pointSize
+        if !traits.isDisjoint(with: [.code, .codeBlock]) {
+            attributes[.foregroundColor] = NSColor.codeLabel
+            if !self.font.isFixedPitch {
+                attributes[.kern] = Self.codeTracking * font.pointSize
+            }
         }
         if traits.contains(.strikethrough) {
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
