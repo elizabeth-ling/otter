@@ -64,6 +64,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// The app that was frontmost before the folder picker or the Save panel activated Otter. It's
     /// activated again when the panel hides, so focus lands where it would have without them.
     private var appToReactivate: NSRunningApplication?
+    /// Suspends the toggle hotkey while the panel is key (`takeToggleChordWhileKey`).
+    private var suspendToggleHotkey: ((Bool) -> Void)?
 
     private var isShown: Bool { panel.isVisible && !isHiding }
 
@@ -117,6 +119,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.minSize = PanelPlacement.minimumSize
         panel.delegate = self
         panel.onCancel = { [weak self] in self?.hide() }
+        panel.onToggleChord = { [weak self] in
+            Logger.panel.debug("Toggle chord pressed in the panel")
+            self?.toggle()
+        }
         content.editor.onCommand = { [weak self] command in self?.perform(command) }
         content.editor.onTextChange = { [weak self] in self?.saveDraft() }
         content.editor.onAttach = { [weak self] pasted in self?.attach(pasted) }
@@ -142,9 +148,21 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Hands the toggle chord to the panel while it has keyboard focus: `suspendHotkey(true)` when
+    /// it becomes key, `false` when it resigns, and the panel matches its key-downs with
+    /// `isToggleChord` meanwhile. Set once the hotkeys are registered.
+    func takeToggleChordWhileKey(isToggleChord: @escaping (NSEvent) -> Bool, suspendHotkey: @escaping (Bool) -> Void) {
+        panel.isToggleChord = isToggleChord
+        suspendToggleHotkey = suspendHotkey
+        suspendHotkey(panel.isKeyWindow)
+    }
+
     /// The toggle hotkey (T02 table).
     func toggle() {
-        switch PanelToggleAction(panelIsVisible: isShown, panelIsKey: panel.isKeyWindow) {
+        let action = PanelToggleAction(panelIsVisible: isShown, panelIsKey: panel.isKeyWindow)
+        let keyWindow = NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "none"
+        Logger.panel.debug("Toggle: \(String(describing: action), privacy: .public) (key window: \(keyWindow, privacy: .public))")
+        switch action {
         case .showAndMakeKey:
             beginVisibleSignpost()
             show()
@@ -219,6 +237,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         #if OTTER_TEST_HOOKS
         testOnHide?()
         #endif
+        content.editor.dismissCorrectionIndicator()
         if didRestoreDraft {
             draftStore.saveNow(currentDraft)
         }
@@ -272,6 +291,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowDidBecomeKey(_ notification: Notification) {
+        suspendToggleHotkey?(true)
         guard awaitingVisible else {
             return
         }
@@ -281,6 +301,7 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     /// Clicking elsewhere closes the panel. Switching Spaces doesn't, although it also takes key.
     func windowDidResignKey(_ notification: Notification) {
+        suspendToggleHotkey?(false)
         // Not shown: an `Esc` or hotkey hide is ordering it out.
         guard !settings.keepPanelOpenWhenClickingElsewhere, isShown, !isShowingDialog else {
             return

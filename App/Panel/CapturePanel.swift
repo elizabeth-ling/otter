@@ -6,6 +6,10 @@ import AppKit
 final class CapturePanel: NSPanel {
     /// `Esc`. T04's editor routes its own `cancelOperation(_:)` here too.
     var onCancel: (() -> Void)?
+    /// Whether a key-down is the toggle hotkey's chord. See `sendEvent(_:)`.
+    var isToggleChord: ((NSEvent) -> Bool)?
+    /// The toggle chord was pressed while the panel had keyboard focus.
+    var onToggleChord: (() -> Void)?
 
     init(contentRect: NSRect) {
         // `.nonactivatingPanel` must be in the mask at init: toggling it later has known quirks.
@@ -40,5 +44,19 @@ final class CapturePanel: NSPanel {
 
     override func cancelOperation(_ sender: Any?) {
         onCancel?()
+    }
+
+    /// While the panel has keyboard focus the toggle hotkey is suspended and its chord arrives
+    /// here as a key-down (`HotkeyService.setToggleSuspended(_:)`). Caught before the editor, which
+    /// would type it. macOS's autocorrect bubble passes key presses on to here too. Repeats, from
+    /// the chord held down past the show, are swallowed.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, isToggleChord?(event) == true {
+            if !event.isARepeat {
+                onToggleChord?()
+            }
+            return
+        }
+        super.sendEvent(event)
     }
 }

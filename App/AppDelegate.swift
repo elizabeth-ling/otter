@@ -111,6 +111,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             clipboardCapture.save()
         }
         hotkeys.start()
+        panel.takeToggleChordWhileKey { [weak hotkeys] event in
+            hotkeys?.isToggleChord(event) ?? false
+        } suspendHotkey: { [weak hotkeys] suspended in
+            hotkeys?.setToggleSuspended(suspended)
+        }
         hotkeyService = hotkeys
         hotkeyReadyAfter = logHotkeyReady()
 
