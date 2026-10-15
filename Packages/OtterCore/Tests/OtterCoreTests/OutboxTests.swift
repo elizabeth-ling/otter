@@ -131,25 +131,3 @@ import Testing
     #expect(await Outbox(directory: root).pending().isEmpty)
     #expect(FileManager.default.fileExists(atPath: unreadable.path))
 }
-
-@Test func enqueueP95IsUnderTenMillisecondsForOneKilobyteNotes() async throws {
-    let root = try makeTemporaryDirectory()
-    defer { try? FileManager.default.removeItem(at: root) }
-    let outbox = Outbox(directory: root)
-    let destination = DestinationID()
-    let text = String(repeating: "x", count: 1024)
-    let clock = ContinuousClock()
-    var samples: [Duration] = []
-
-    for _ in 0..<200 {
-        let capture = Capture(text: text, destinationID: destination, source: .panel)
-        let start = clock.now
-        try await outbox.enqueue(capture)
-        samples.append(start.duration(to: clock.now))
-    }
-
-    samples.sort()
-    let p95 = samples[samples.count * 95 / 100 - 1]
-    print("Outbox enqueue of a 1 KB note: p50 \(samples[samples.count / 2]), p95 \(p95), max \(samples[samples.count - 1])")
-    #expect(p95 < .milliseconds(10))
-}

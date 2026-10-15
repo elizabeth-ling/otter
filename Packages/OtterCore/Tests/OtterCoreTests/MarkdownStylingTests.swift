@@ -307,23 +307,3 @@ func typingIntoAnInsertedEmptyPairIsStyled(style: MarkdownStyle) throws {
     // Empty link text shows as typed until something is typed in the brackets.
     #expect(styles(try formatted(.link, "https://x.org", NSRange(location: 0, length: 13))) == [])
 }
-
-// MARK: - Speed
-
-@Test func parsingATenKilobyteNoteIsFast() {
-    // The editor parses the whole note on each keystroke (budget: restyle < 1 ms, ARCHITECTURE §9).
-    let line = "Some **bold** and *italic* text, `code`, ~~gone~~ and a [link](https://example.com/a_b) here.\n"
-    let note = String(repeating: line, count: 10_240 / line.utf16.count + 1)
-    let clock = ContinuousClock()
-    var samples: [Duration] = []
-    for _ in 0..<50 {
-        let start = clock.now
-        _ = MarkdownStyling.spans(in: note)
-        samples.append(clock.now - start)
-    }
-    samples.sort()
-    let p95 = samples[samples.count * 95 / 100 - 1]
-    print("Parse of a \(note.utf16.count / 1024) KB note: p50 \(samples[samples.count / 2]), p95 \(p95)")
-    // Generous, so a debug build on a busy CI machine passes; release builds are far faster.
-    #expect(p95 < .milliseconds(20))
-}

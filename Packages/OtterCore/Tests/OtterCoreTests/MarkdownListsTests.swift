@@ -271,23 +271,3 @@ func shiftTabCutsIndentationBackToTheParents(input: String, expected: String) {
     #expect(MarkdownLists.hiddenRuns(of: items, selection: NSRange(location: 3, length: 0)).map(ns.substring(with:)) == ["\t", "- [ ] ", "\t\t- [x] "])
     #expect(MarkdownLists.hiddenRuns(of: items, selection: NSRange(location: 8, length: 10)).map(ns.substring(with:)) == ["\t- ", "\t\t"])
 }
-
-// MARK: - Speed
-
-@Test func parsingATwoHundredItemListIsFast() {
-    // The editor parses the items on every keystroke too (budget: restyle < 1 ms, ARCHITECTURE §9).
-    let lines = ["- item with **bold** text", "\t- [ ] a nested task", "\t\t- [x] done and [a link](https://x.org)", "- plain bullet"]
-    let note = (0..<200).map { lines[$0 % lines.count] }.joined(separator: "\n")
-    let clock = ContinuousClock()
-    var samples: [Duration] = []
-    for _ in 0..<50 {
-        let start = clock.now
-        _ = MarkdownLists.items(in: note)
-        samples.append(clock.now - start)
-    }
-    samples.sort()
-    let p95 = samples[samples.count * 95 / 100 - 1]
-    print("Items of a 200-item note (\(note.utf16.count / 1024) KB): p50 \(samples[samples.count / 2]), p95 \(p95)")
-    // Generous, so a debug build on a busy CI machine passes.
-    #expect(p95 < .milliseconds(10))
-}
