@@ -911,7 +911,8 @@ final class EditorTextView: NSTextView {
 
     /// A faint rounded box behind each inline code span's text in `rect`, one per line it wraps
     /// onto, a little wider than the text so it doesn't touch the box's edges. It's sized from the
-    /// code font around the baseline, not the line, so the line spacing doesn't stretch it.
+    /// code font at the editor's size around the baseline, not the line, so the line spacing
+    /// doesn't stretch it.
     private func drawInlineCodeBackgrounds(in rect: NSRect) {
         guard let styler, let layoutManager = textLayoutManager, let content = layoutManager.textContentManager, let textStorage else {
             return
@@ -933,13 +934,15 @@ final class EditorTextView: NSTextView {
             else {
                 continue
             }
+            let ascender = font.ascender * styler.inlineCodeBoxScale
+            let descender = font.descender * styler.inlineCodeBoxScale
             layoutManager.enumerateTextSegments(in: range, type: .standard, options: .rangeNotRequired) { _, frame, baseline, _ in
                 let baselineY = origin.y + frame.minY + baseline
                 let box = NSRect(
                     x: origin.x + frame.minX - Self.inlineCodePadding.width,
-                    y: baselineY - font.ascender - Self.inlineCodePadding.height,
+                    y: baselineY - ascender - Self.inlineCodePadding.height,
                     width: frame.width + 2 * Self.inlineCodePadding.width,
-                    height: font.ascender - font.descender + 2 * Self.inlineCodePadding.height
+                    height: ascender - descender + 2 * Self.inlineCodePadding.height
                 )
                 drawCodeBox(box, radius: Self.inlineCodeRadius)
                 return true
@@ -948,7 +951,7 @@ final class EditorTextView: NSTextView {
     }
 
     /// Around an inline code span's text. The span's hidden backticks are as wide as its width.
-    private static let inlineCodePadding = CGSize(width: MarkdownStyler.inlineCodePadding, height: 1)
+    private static let inlineCodePadding = CGSize(width: MarkdownStyler.inlineCodePadding, height: 2)
     private static let inlineCodeRadius: CGFloat = 4
 
     /// A code box: a faint fill inside a hairline border, its stroke kept inside `rect`.

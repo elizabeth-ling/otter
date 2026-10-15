@@ -638,7 +638,11 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             // puts the caret, and so the box's edge, halfway through one, and drops one at a line's end.
             return [.font: traits.contains(.codePadding) ? Self.codePaddingFont : Self.hiddenFont, .foregroundColor: NSColor.clear]
         }
-        var attributes: [NSAttributedString.Key: Any] = [.font: font(for: traits, headingLevel: headingLevel), .foregroundColor: NSColor.labelColor]
+        let font = font(for: traits, headingLevel: headingLevel)
+        var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+        if !traits.isDisjoint(with: [.code, .codeBlock]), !self.font.isFixedPitch {
+            attributes[.kern] = Self.codeTracking * font.pointSize
+        }
         if traits.contains(.strikethrough) {
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
         }
@@ -659,8 +663,8 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         return attributes
     }
 
-    /// The editor's font with the traits' faces; code in the monospaced system font at the same
-    /// size, unless the editor's font is monospaced already. A heading is bold, and larger by level.
+    /// The editor's font with the traits' faces; code in the monospaced system font, a little
+    /// smaller, unless the editor's font is monospaced already. A heading is bold, and larger by level.
     private func font(for traits: Traits, headingLevel: Int?) -> NSFont {
         let level = traits.contains(.heading) ? headingLevel : nil
         let key = FontKey(traits: traits.intersection([.bold, .italic, .code, .codeBlock]), headingLevel: level ?? 0)
@@ -671,7 +675,7 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         let isCode = key.traits.contains(.code) || key.traits.contains(.codeBlock)
         var result: NSFont
         if isCode, !font.isFixedPitch {
-            result = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+            result = NSFont.monospacedSystemFont(ofSize: size * Self.codeScale, weight: .regular)
         } else {
             result = size == font.pointSize ? font : NSFont(descriptor: font.fontDescriptor, size: size) ?? font
         }
@@ -687,6 +691,11 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
     /// `#` to `######` in em of the editor's font: Obsidian's default heading sizes.
     private static let headingScales: [CGFloat] = [1.802, 1.602, 1.424, 1.266, 1.125, 1]
+    /// The monospaced system font's size against the editor's, and the space it loses between
+    /// letters, in em of its own size: SF Mono is wide next to the system font. Obsidian's code is
+    /// 0.875 em.
+    private static let codeScale: CGFloat = 0.9
+    private static let codeTracking: CGFloat = -0.03
     /// The space added after each line, in em: 5 pt at the default 15 pt, Obsidian's line height
     /// (`context/ui/line-spacing-ref.png`).
     private static let lineSpacing: CGFloat = 0.35
@@ -700,14 +709,20 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
     private static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
+    /// How much taller the box around an inline code span is than its text's font: as tall as the
+    /// code font would be at the editor's size, so the smaller code doesn't shrink the box.
+    var inlineCodeBoxScale: CGFloat {
+        font.isFixedPitch ? 1 : 1 / Self.codeScale
+    }
+
     /// The padding either side of an inline code span's text, inside the box `EditorTextView`
-    /// draws around it: the width of a backtick in `codePaddingFont`, about 3 pt.
+    /// draws around it: the width of a backtick in `codePaddingFont`, about 4 pt.
     static let inlineCodePadding = backtickWidth(in: codePaddingFont)
 
-    /// A backtick in it is about 3 pt wide. Not exactly: the system font's tracking varies by size.
+    /// A backtick in it is about 4 pt wide. Not exactly: the system font's tracking varies by size.
     private static let codePaddingFont: NSFont = {
         let size: CGFloat = 10
-        return NSFont.systemFont(ofSize: size * 3 / backtickWidth(in: .systemFont(ofSize: size)))
+        return NSFont.systemFont(ofSize: size * 4 / backtickWidth(in: .systemFont(ofSize: size)))
     }()
 
     private static func backtickWidth(in font: NSFont) -> CGFloat {
