@@ -843,7 +843,7 @@ final class EditorTextView: NSTextView {
             return
         }
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: font ?? .systemFont(ofSize: 15),
+            .font: font ?? .systemFont(ofSize: 14),
             .foregroundColor: NSColor.dimmedLabel,
         ]
         let padding = textContainer?.lineFragmentPadding ?? 0
