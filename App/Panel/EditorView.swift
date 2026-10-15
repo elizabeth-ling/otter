@@ -900,14 +900,15 @@ final class EditorTextView: NSTextView {
         }
         let width = textContainer?.size.width ?? bounds.width
         for extent in extents.values {
-            let minY = extent.starts ? extent.minY + styler.codeBlockMargin : rect.minY - Self.codeBlockRadius
-            let maxY = extent.ends ? extent.maxY : rect.maxY + Self.codeBlockRadius
+            let minY = extent.starts ? extent.minY + styler.codeBlockMargin : rect.minY - Self.codeBoxRadius
+            let maxY = extent.ends ? extent.maxY : rect.maxY + Self.codeBoxRadius
             let block = NSRect(x: origin.x, y: minY, width: width, height: maxY - minY)
-            drawCodeBox(block, radius: Self.codeBlockRadius)
+            drawCodeBox(block, radius: Self.codeBoxRadius)
         }
     }
 
-    private static let codeBlockRadius: CGFloat = 6
+    /// Both kinds of code box's corners, so inline code matches code blocks.
+    private static let codeBoxRadius: CGFloat = 6
 
     /// A faint rounded box behind each inline code span's text in `rect`, one per line it wraps
     /// onto, a little wider than the text so it doesn't touch the box's edges. It's sized from the
@@ -944,15 +945,14 @@ final class EditorTextView: NSTextView {
                     width: frame.width + 2 * Self.inlineCodePadding.width,
                     height: ascender - descender + 2 * Self.inlineCodePadding.height
                 )
-                drawCodeBox(box, radius: Self.inlineCodeRadius)
+                drawCodeBox(box, radius: Self.codeBoxRadius)
                 return true
             }
         }
     }
 
     /// Around an inline code span's text. The span's hidden backticks are as wide as its width.
-    private static let inlineCodePadding = CGSize(width: MarkdownStyler.inlineCodePadding, height: 2)
-    private static let inlineCodeRadius: CGFloat = 4
+    private static let inlineCodePadding = CGSize(width: MarkdownStyler.inlineCodePadding, height: 3)
 
     /// A code box: a faint fill inside a hairline border, its stroke kept inside `rect`.
     private func drawCodeBox(_ rect: NSRect, radius: CGFloat) {

@@ -725,13 +725,13 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     }
 
     /// The padding either side of an inline code span's text, inside the box `EditorTextView`
-    /// draws around it: the width of a backtick in `codePaddingFont`, about 4 pt.
+    /// draws around it: the width of a backtick in `codePaddingFont`, about 5 pt.
     static let inlineCodePadding = backtickWidth(in: codePaddingFont)
 
-    /// A backtick in it is about 4 pt wide. Not exactly: the system font's tracking varies by size.
+    /// A backtick in it is about 5 pt wide. Not exactly: the system font's tracking varies by size.
     private static let codePaddingFont: NSFont = {
         let size: CGFloat = 10
-        return NSFont.systemFont(ofSize: size * 4 / backtickWidth(in: .systemFont(ofSize: size)))
+        return NSFont.systemFont(ofSize: size * 5 / backtickWidth(in: .systemFont(ofSize: size)))
     }()
 
     private static func backtickWidth(in font: NSFont) -> CGFloat {
