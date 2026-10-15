@@ -14,3 +14,12 @@ The first release.
 - Save the clipboard without opening the panel, with a shortcut of your choice.
 - Notes are never lost: if a folder isn't reachable, Otter keeps the note and delivers it when it can.
 - Recent notes, launch at login and automatic updates.
+
+## [0.2.0]
+
+- Redesigned Settings.
+- Added additional md styling, like `#` headings and code blocks.
+- New app icon and menu bar icon.
+- Opening a second copy of Otter now quits it.
+- Fixed spelling suggestions and panel show/hide.
+- Choose your line spacing in Settings. Increased default line spacing.
