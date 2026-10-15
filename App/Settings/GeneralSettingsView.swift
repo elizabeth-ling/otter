@@ -35,6 +35,10 @@ struct GeneralSettingsView: View {
                 Stepper(value: $model.fontSize, in: AppSettings.fontSizes, step: 1) {
                     LabeledContent("Size", value: "\(Int(model.fontSize)) pt")
                 }
+                Picker("Line spacing", selection: $model.lineSpacing) {
+                    Text("Compact").tag(EditorLineSpacing.compact)
+                    Text("Comfortable").tag(EditorLineSpacing.comfortable)
+                }
                 Toggle(isOn: $model.smartQuotesAndDashes) {
                     Text("Smart quotes and dashes")
                     Text("Off by default: notes often contain code.")
