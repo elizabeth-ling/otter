@@ -23,3 +23,11 @@ The first release.
 - Opening a second copy of Otter now quits it.
 - Fixed spelling suggestions and panel show/hide.
 - Choose your line spacing in Settings. Increased default line spacing.
+
+## [0.3.0]
+
+- Inline code and code blocks have a border and grey text. Code blocks fill the panel's width and close automatically.
+- New Autocorrect setting in Settings › General. It's off by default and never touches code.
+- The default text size is now 14 instead of 15.
+- Better line spacing, and bullets line up with their text, in dark mode too.
+- The installer window is redesigned.
