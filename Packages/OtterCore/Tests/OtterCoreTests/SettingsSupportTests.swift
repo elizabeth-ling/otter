@@ -21,7 +21,7 @@ private func folderConfig(_ name: String, displayPath: String? = nil, mode: Fold
     defer { suite.remove() }
     let settings = AppSettings(defaults: suite.defaults)
 
-    #expect(settings.keepPanelOpenWhenClickingElsewhere == false)
+    #expect(settings.keepPanelOpenWhenClickingElsewhere == true)
     #expect(settings.fontFamily == .system)
     #expect(settings.fontSize == 15)
     #expect(settings.smartQuotesAndDashes == false)

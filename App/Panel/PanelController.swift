@@ -159,23 +159,19 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     /// The toggle hotkey (T02 table).
     func toggle() {
-        let action = PanelToggleAction(panelIsVisible: isShown, panelIsKey: panel.isKeyWindow)
+        let action = PanelToggleAction(panelIsVisible: isShown)
         let keyWindow = NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "none"
         Logger.panel.debug("Toggle: \(String(describing: action), privacy: .public) (key window: \(keyWindow, privacy: .public))")
         switch action {
         case .showAndMakeKey:
             beginVisibleSignpost()
             show()
-        case .makeKey:
+        case .hide:
             guard !isShowingDialog else {
-                // The dialog has key; bring it back rather than taking key from it.
+                // The dialog has key; bring it back rather than hiding the panel from under it.
                 NSApp.activate()
                 return
             }
-            beginVisibleSignpost()
-            panel.makeKeyAndOrderFront(nil)
-            focusEditor()
-        case .hide:
             hide()
         }
     }

@@ -171,7 +171,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 | Shortcut | Scope | Action |
 |---|---|---|
-| `⌥Space` *(default; `⌘Space` optional, set up in onboarding — see ADR-010, ADR-011)* | Global | Toggle panel (show → focus → hide) |
+| `⌥Space` *(default; `⌘Space` optional, set up in onboarding — see ADR-010, ADR-011)* | Global | Toggle panel (show → hide), focused or not |
 | *unset (suggest `⌥⇧Space`)* | Global | Save clipboard as a note instantly, show HUD |
 | `⌘↩` | Panel | Save and close |
 | `⇧⌘↩` | Panel | Save and keep open (cleared, ready for the next note) |
@@ -195,7 +195,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 The formatting shortcuts only add or remove Markdown markers; the editor then styles the text and hides the markers, the same as typed Markdown (§1, Inline Markdown styling). Each is one `⌘Z` step. Surrounding spaces stay outside the markers, a selection across lines is done line by line (blank lines skipped, list and quote markers left outside), and bold and italic nest (`***both***`) rather than undoing each other.
 
-Clicking outside the panel closes it (keeps the draft). Setting: "Keep panel open when clicking elsewhere".
+Clicking outside the panel leaves it open; the toggle hotkey closes it (keeps the draft). Setting: "Close panel when clicking elsewhere" (off by default).
 
 ## 3. Save-clipboard HUD
 
@@ -260,7 +260,7 @@ The tabs sit in a centred preference-style toolbar, each an icon over its name; 
 
 **General**
 - Launch at login: shows the login item as macOS has it. While macOS waits for approval, "Approve in System Settings › General › Login Items." with an **Open Login Items** button
-- Close panel when clicking elsewhere
+- Close panel when clicking elsewhere (off by default)
 - Font: System / Monospaced, size
 - Smart quotes and dashes (off by default — notes often contain code)
 - Autocorrect (off by default; misspellings are still underlined)

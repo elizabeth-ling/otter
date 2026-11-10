@@ -2,18 +2,11 @@
 /// The panel controller (T03) asks this on every key press.
 public enum PanelToggleAction: Equatable, Sendable {
     case showAndMakeKey
+    /// Visible, whether or not it's key: with "Keep panel open" on, a click elsewhere leaves the
+    /// panel open, and the hotkey is what closes it.
     case hide
-    /// Visible but not key: the user clicked elsewhere with "Keep panel open" on.
-    case makeKey
 
-    public init(panelIsVisible: Bool, panelIsKey: Bool) {
-        switch (panelIsVisible, panelIsKey) {
-        case (false, _):
-            self = .showAndMakeKey
-        case (true, true):
-            self = .hide
-        case (true, false):
-            self = .makeKey
-        }
+    public init(panelIsVisible: Bool) {
+        self = panelIsVisible ? .hide : .showAndMakeKey
     }
 }

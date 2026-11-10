@@ -31,10 +31,10 @@ public struct AppSettings {
         self.defaults = defaults
     }
 
-    /// "Close panel when clicking elsewhere", stored as its opposite. Off by default: a click
-    /// elsewhere closes the panel.
+    /// "Close panel when clicking elsewhere", stored as its opposite. On by default: a click
+    /// elsewhere leaves the panel open, and the toggle hotkey closes it.
     public var keepPanelOpenWhenClickingElsewhere: Bool {
-        get { defaults.bool(forKey: Key.keepPanelOpen) }
+        get { defaults.object(forKey: Key.keepPanelOpen) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Key.keepPanelOpen) }
     }
 
