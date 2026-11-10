@@ -53,7 +53,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             // A template image follows the menu bar's appearance and tint; the badge is a view on top.
             // The app icon's glyph, a vector in the asset catalog, sized to the menu bar's 16pt cap height.
             let image = NSImage(named: "MenuBarIcon")
-            image?.size = NSSize(width: 16 * 591 / 700, height: 16)
+            image?.size = NSSize(width: 16 * 766 / 702, height: 16)
             image?.isTemplate = true
             image?.accessibilityDescription = "Otter"
             button.image = image
