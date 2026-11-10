@@ -1,5 +1,4 @@
 import AppKit
-import KeyboardShortcuts
 import Observation
 import OtterCore
 import os
