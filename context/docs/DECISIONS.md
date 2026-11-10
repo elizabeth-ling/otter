@@ -212,7 +212,7 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 **Consequences.** `EditorTextView` takes on custom drawing and a mouse hit-test for checkboxes. Hidden leading tabs need care: a tab advances to the next tab stop whatever its font (T18 spikes a fix). A hidden prefix snaps forward on arrival while inline runs snap back, so `HiddenMarkerEditing` must keep them apart and know which lines are revealed. Other bullets, numbering and lists in quotes can follow the same pattern later.
 
-## ADR-018 · Lists render on the caret line too; Obsidian's spacing, circles for tasks (amends ADR-017)
+## ADR-018 · Lists render on the caret line too; Obsidian's spacing, circles for tasks (amends ADR-017) — **Numbered items added by ADR-022**
 
 **Context.** ADR-017 showed the raw marker on the caret line and drew a bullet or box only once the caret left, with the text in a gutter wide enough for `- [x] `. In Obsidian itself, typing `- ` shows a bullet straight away, and the product owner wants that, plus circular checkboxes, bigger bullets and Obsidian's spacing (reference: `context/ui/obsidian-reference.png`).
 
@@ -268,3 +268,14 @@ Short ADRs. Status is **Accepted** unless noted. To change one, add a new ADR th
 
 **Consequences.** Moving the caret into or out of a code block grows or shrinks it by its fences' lines, as in Obsidian. Headings and lines starting with a styled span now get the same spacing as other lines.
 
+## ADR-022 · `1. ` numbered items are list items (amends ADR-017, ADR-018)
+
+**Context.** ADR-017 left numbered lists as typed. The product owner wants `1.` / `2.` lists to behave like `- ` lists: nesting, `↩` to continue, a shortcut.
+
+**Decision.**
+- Outside a fence, indentation, one to nine digits, `.` or `)`, and a space or tab make a numbered item (CommonMark). It nests, hides its indentation, and follows `Tab`, `⇧Tab`, `⌫` and `⌦` exactly as a bullet does. It's never a task: `1. [ ] a` is a numbered item whose text is `[ ] a`.
+- Its marker is hidden like a bullet's and `EditorTextView` draws the number as typed (`1.`, `2)`), grey, ending where the raw marker would, so revealing it doesn't move it. The text starts where a bullet's does, or later if the marker (`10. `) is wider than 1.34 em. The number shown is the one typed, not a computed one, so the screen matches the file.
+- `↩` starts the next number with the same delimiter. The numbered items after it at its level that count up by one from it go up by one too, so `1 2 3` stays `1 2 3 4`; numbering that doesn't count up (`1. 1. 1.`, a gap) is left as typed from where it stops. `↩` at the start of an item puts an empty item above with its number and pushes it down the same way.
+- `⇧⌘7` (Google Docs, Notion) numbers the selected lines from 1 at each indentation, going on from a numbered item just above, in place of any marker; on lines that are all numbered it removes the numbers. `⇧⌘8` turns numbered items into bullets, and `⌘L` makes a numbered item a `- [ ]` task.
+
+**Consequences.** Nothing else renumbers: `Tab`, `⇧Tab`, `⌫` on a marker or deleting an item can leave numbers out of order, which Markdown renders in order anyway. Items `9.` and `10.` in one list start their text 0.4 em apart, since each item's start is laid out on its own line. A line like `2024. was a good year` becomes a list item, as it is in any Markdown renderer.

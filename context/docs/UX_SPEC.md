@@ -99,7 +99,7 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 - Styles combine: bold inside a link, struck-through italic. Nothing inside inline code is styled.
 - Rules follow CommonMark/GFM as Obsidian renders them, within one line: a span never crosses a line break; `\*` is a literal `*` (the backslash stays visible); `_` doesn't open or close inside a word (`snake_case_name` stays plain); an unclosed marker, or one with a space just inside (`** x **`), is plain text.
 - Lines inside a fenced code block (```` ``` ```` or `~~~`) get no inline styles; the block is styled as a whole (Headings and code blocks below).
-- Not styled, shown as typed: `*` / `+` bullets and numbered lists, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML. `- ` bullets and `- [ ]` tasks are covered under Lists and tasks below.
+- Not styled, shown as typed: `*` / `+` bullets, block quotes, tables, rules, highlights `==…==`, wikilinks `[[…]]`, images `![…](…)`, bare URLs, HTML. `- ` bullets, `- [ ]` tasks and `1. ` numbered lists are covered under Lists and tasks below.
 - Follows the Font setting (§5): bold and italic are faces of the chosen font; with Monospaced, inline code keeps only its background.
 
 **When markers hide**
@@ -134,19 +134,21 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 
 ### Lists and tasks
 
-`- ` bullets and `- [ ]` tasks look like a list, and the note stays plain Markdown (ADR-017, ADR-018, T18). As in Obsidian, typing `- ` shows a bullet straight away and `- [ ] ` a circle, on the line you're on too; the raw marker shows only while the caret is in it.
+`- ` bullets, `- [ ]` tasks and `1. ` numbered items look like a list, and the note stays plain Markdown (ADR-017, ADR-018, ADR-022, T18). As in Obsidian, typing `- ` shows a bullet straight away and `- [ ] ` a circle, on the line you're on too; the raw marker shows only while the caret is in it.
 
 | Markdown, at a line's start | Shown as |
 |---|---|
 | `- item` | `•` item |
 | `- [ ] task` | ○ task |
 | `- [x] done`, `- [X] done` | ✓ in an accent-filled circle; done, dimmed and struck through |
+| `1. item`, `1) item` | `1.` item, the number grey and as typed |
 
-- A line counts when its indentation is followed by `-` and one space. A task also needs the space after `]`. These show as typed: a lone `-`, `---`, `*` / `+` / numbered lists, lists in a `>` quote, and lines inside a fence.
+- A line counts when its indentation is followed by `-` and one space. A task also needs the space after `]`. A numbered item is one to nine digits, `.` or `)`, and one space; it's never a task. These show as typed: a lone `-`, `---`, `*` / `+` lists, lists in a `>` quote, and lines inside a fence.
 - Each nesting level indents 1.34 em, the same as from plain text to a bullet's text; a task's text starts at 1.75 em. The bullet is a grey dot 0.28 em across and the checkbox a grey ring 0.94 em across, both centred 0.87 em in (measured from Obsidian). Wrapped lines hang under the item's text. An item is one level deeper than the nearest item above it with less indentation, so lists indented with 2 spaces, 4 spaces or tabs all nest. The indentation characters are always hidden.
 - While the caret is in an item's marker (`←` from the start of its text steps in), or a selection includes part of it, the marker shows as raw text (`- `, `- [ ] `, `- [x] `) in `tertiaryLabelColor`. `- ` hangs left of the text; `- [ ] ` pushes the text right, as in Obsidian. Otherwise the marker is hidden and a bullet or circle is drawn, including on the caret line, so after `↩` continues a list the new line shows a bullet straight away.
 - Arriving on an item line from elsewhere (click, `↑` / `↓`, `→`, `⌘←`) puts the caret at the start of the item's text, so typing goes into the item. `←` from there steps into the marker, which then shows as ordinary text, and you can edit `- [ ]` directly. Hidden indentation is skipped, and a selection that includes the `-` takes the indentation with it (`⌘A` then `⌫` empties the note).
-- `↩` continues the list with the same indentation. A new task is always unchecked, and text after the caret moves to the new item. `↩` on an empty item outdents it if it's nested, or otherwise removes the marker and ends the list.
+- A number is drawn where its raw marker would end, so revealing it doesn't move it; a marker wider than 1.34 em (`10. `) pushes its text right.
+- `↩` continues the list with the same indentation. A new task is always unchecked, a numbered item gets the next number (and the numbers after it that count on from it go up by one), and text after the caret moves to the new item. `↩` on an empty item outdents it if it's nested, or otherwise removes the marker and ends the list.
 - `⌫` at the start of an item's text removes its marker (all of `- [ ] ` for a task) and keeps the indentation. `⌦` at the end of an item joins the next item's text onto it.
 - `Tab` / `⇧Tab` in an item indent it under the item above / outdent it back to its parent's indentation, using tab characters. Elsewhere `Tab` still inserts a tab.
 - Clicking a drawn circle ticks or unticks it, writing `[x]` or `[ ]`, without moving the caret, on any line. A revealed raw `[ ]` is plain text: a click places the caret there, and `⌘L` toggles it. Each list action is one `⌘Z` step.
@@ -187,7 +189,8 @@ The note stays plain Markdown. The editor styles inline Markdown as it's typed, 
 | `⌘E` | Panel | Inline code `` `…` ``, the same way |
 | `⌘K` | Panel | Link: `[selection](url)` with `url` selected to type over (the link shows raw while you do). A URL on the clipboard is used instead, caret after the link; a selected URL becomes `[](URL)` with the caret in the brackets. In an existing link, shows it raw and selects its URL |
 | `⌘L` | Panel | Task: makes the line, or each selected line, a `- [ ]` task; on a task, checks or unchecks it (T18) |
-| `⇧⌘8` | Panel | Bullet: adds `- ` to the line or selected lines; removes it if they're all list items already (T18) |
+| `⇧⌘8` | Panel | Bullet: adds `- ` to the line or selected lines, in place of a number; removes it if they're all bullets or tasks already (T18) |
+| `⇧⌘7` | Panel | Numbered list: numbers the line or selected lines `1. `, `2. `… at each indentation, going on from a numbered item just above; removes the numbers if they're all numbered already (ADR-022) |
 | `Tab` / `⇧Tab` | Panel | In a list item: indent / outdent it. Elsewhere `Tab` inserts a tab (T18) |
 | `↩` | Panel | In a list item: continues the list. On an empty item, outdents it or ends the list (T18) |
 | `⌘,` | Panel | Open Settings |

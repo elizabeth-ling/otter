@@ -322,13 +322,18 @@ final class EditorTextView: NSTextView {
             applyFormatting(style)
             return true
         }
-        // `⌘L` toggles a task, `⇧⌘8` a bullet (T18). The `8` key by code: some layouts give `*`.
+        // `⌘L` toggles a task, `⇧⌘8` a bullet (T18), `⇧⌘7` a number (ADR-022). The `8` and `7`
+        // keys by code: some layouts give `*` and `&`.
         if flags == .command, key == "l" {
             applyListCommand(.toggleTask, actionName: "Task")
             return true
         }
         if flags == [.command, .shift], event.keyCode == Self.eightKeyCode {
             applyListCommand(.toggleBullet, actionName: "Bullet")
+            return true
+        }
+        if flags == [.command, .shift], event.keyCode == Self.sevenKeyCode {
+            applyListCommand(.toggleOrdered, actionName: "Numbered List")
             return true
         }
 
@@ -380,7 +385,7 @@ final class EditorTextView: NSTextView {
 
     // MARK: Lists (ADR-017)
 
-    /// `⌘L`, `⇧⌘8`, `Tab` and `⇧Tab` as one edit, or a beep if `MarkdownLists` refuses.
+    /// `⌘L`, `⇧⌘8`, `⇧⌘7`, `Tab` and `⇧Tab` as one edit, or a beep if `MarkdownLists` refuses.
     private func applyListCommand(_ command: ListCommand, actionName: String) {
         guard let edit = MarkdownLists.apply(command, to: string, selection: selectedRange()) else {
             NSSound.beep()
@@ -1068,16 +1073,19 @@ final class EditorTextView: NSTextView {
 
     // MARK: Bullets and checkboxes (ADR-017, ADR-018)
 
-    /// A drawn bullet or circle: an item whose marker isn't revealed, where its first line sits.
+    /// A drawn bullet, circle or number: an item whose marker isn't revealed, where its first line
+    /// sits.
     private struct ListMarker {
         let item: MarkdownListItem
         /// The x where the item's level starts, in view coordinates.
         let levelStart: CGFloat
+        /// The x where the item's text starts, in view coordinates.
+        let textStart: CGFloat
         /// The first line's baseline, in view coordinates.
         let baseline: CGFloat
     }
 
-    /// The bullets and circles to draw in `rect`: the items there whose marker the selection isn't
+    /// The bullets, circles and numbers to draw in `rect`: the items there whose marker the selection isn't
     /// in. Uses TextKit 2's layout fragments only; touching `layoutManager` would switch the
     /// view to TextKit 1.
     private func listMarkers(in rect: NSRect) -> [ListMarker] {
@@ -1090,6 +1098,7 @@ final class EditorTextView: NSTextView {
         }
         let origin = textContainerOrigin
         let padding = textContainer?.lineFragmentPadding ?? 0
+        let text = string as NSString
         let documentStart = content.documentRange.location
         let top = layoutManager.textLayoutFragment(for: CGPoint(x: 0, y: max(rect.minY - origin.y, 0)))?.rangeInElement.location ?? documentStart
         var markers: [ListMarker] = []
@@ -1108,6 +1117,7 @@ final class EditorTextView: NSTextView {
                 markers.append(ListMarker(
                     item: item,
                     levelStart: origin.x + padding + styler.levelStart(level: item.level),
+                    textStart: origin.x + padding + styler.textStart(of: item, in: text),
                     baseline: origin.y + frame.minY + baseline
                 ))
             }
@@ -1133,6 +1143,8 @@ final class EditorTextView: NSTextView {
     /// A bullet is a solid grey dot, 0.28 em across, centred on the x-height. A task is a 0.94 em
     /// circle centred on the capitals: a grey ring, or filled with the accent colour and a white
     /// check. Both are centred 0.87 em past the level's start, as measured from Obsidian (ADR-018).
+    /// A number is its marker as typed (`1.`), grey, ending where the raw marker would, so
+    /// revealing it doesn't move it (ADR-022).
     private func draw(_ marker: ListMarker) {
         guard let styler else {
             return
@@ -1144,6 +1156,18 @@ final class EditorTextView: NSTextView {
             let diameter = Self.bulletDiameter * em
             NSColor.dimmedLabel.setFill()
             NSBezierPath(ovalIn: NSRect(x: center.x - diameter / 2, y: center.y - diameter / 2, width: diameter, height: diameter)).fill()
+        case .ordered:
+            let ns = string as NSString
+            guard let numberRange = marker.item.numberRange, NSMaxRange(marker.item.markerRange) <= ns.length else {
+                return
+            }
+            let font = styler.font
+            let number = ns.substring(with: NSRange(location: numberRange.location, length: numberRange.length + 1))
+            let x = marker.textStart - styler.width(of: ns.substring(with: marker.item.markerRange))
+            (number as NSString).draw(
+                at: CGPoint(x: x, y: marker.baseline - font.ascender),
+                withAttributes: [.font: font, .foregroundColor: NSColor.dimmedLabel]
+            )
         case let .task(checked):
             let circle = circleRect(for: marker)
             if checked {
@@ -1292,6 +1316,7 @@ final class EditorTextView: NSTextView {
     private static let deleteKeyCode: UInt16 = 51
     /// The `8` key on the main row (`kVK_ANSI_8`).
     private static let eightKeyCode: UInt16 = 28
+    private static let sevenKeyCode: UInt16 = 26
 
     private struct EditShortcut: Hashable {
         let flags: UInt

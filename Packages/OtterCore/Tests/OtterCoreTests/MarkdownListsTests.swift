@@ -41,6 +41,7 @@ private func described(_ text: String) -> [String] {
         switch item.kind {
         case .bullet: return base
         case let .task(checked): return base + (checked ? " [x]" : " [ ]")
+        case let .ordered(number, delimiter): return base + " #\(number)\(delimiter)"
         }
     }
 }
@@ -69,7 +70,39 @@ func bulletsAndTasksAreItems(text: String, expected: [String]) {
     #expect(described(text) == expected)
 }
 
-@Test(arguments: ["-", "-x", "---", "- - -", " - - - ", "-- -", "* a", "+ a", "1. a", "> - a", "", "   ", "a - b"])
+@Test(arguments: [
+    ("1. milk", ["1. |milk #1."]),
+    ("2) jam", ["2) |jam #2)"]),
+    ("10.\tten", ["10.\t|ten #10."]),
+    ("007. bond", ["007. |bond #7."]),
+    ("123456789. a", ["123456789. |a #123456789."]),
+    ("1. ", ["1. | #1."]),
+    ("1.   a", ["1. |  a #1."]),
+    ("\t2. b", ["\t2. |b #2."]),
+    // Never a task: the box is text.
+    ("1. [ ] a", ["1. |[ ] a #1."]),
+])
+func numberedLinesAreItems(text: String, expected: [String]) {
+    #expect(described(text) == expected)
+}
+
+@Test(arguments: ["1.", "1.a", "1 a", "1: a", ". a", "a. b", "1234567890. a", "-1. a", "1.5 a", "#1. a", "> 1. a"])
+func theseAreNotNumberedItems(text: String) {
+    #expect(described(text) == [])
+}
+
+@Test func numberedRangesCoverTheNumber() throws {
+    let text = "x\n\t12) jam\n"
+    let item = try #require(MarkdownLists.items(in: text).first)
+    #expect(item.indentRange == NSRange(location: 2, length: 1))
+    #expect(item.markerRange == NSRange(location: 3, length: 4))
+    #expect(item.numberRange == NSRange(location: 3, length: 2))
+    #expect(item.contentRange == NSRange(location: 7, length: 3))
+    #expect(item.checkboxRange == nil)
+    #expect(MarkdownLists.items(in: "- a").first?.numberRange == nil)
+}
+
+@Test(arguments: ["-", "-x", "---", "- - -", " - - - ", "-- -", "* a", "+ a", "> - a", "", "   ", "a - b"])
 func theseAreNotItems(text: String) {
     #expect(described(text) == [])
 }
@@ -133,6 +166,11 @@ func nestingFollowsIndentation(text: String, expected: [Int]) {
     #expect(levels("\t\t- a\n- b") == [0, 0])
 }
 
+@Test func numberedAndBulletedItemsNestTogether() {
+    #expect(levels("1. a\n\t- b\n\t\t1. c\n2. d") == [0, 1, 2, 0])
+    #expect(levels("- a\n   1. b\n- c") == [0, 1, 0])
+}
+
 @Test func anyOtherLineEndsTheList() {
     #expect(levels("- a\n\t- b\n\n\t- c") == [0, 1, 0])
     #expect(levels("- a\ntext\n\t- b") == [0, 0])
@@ -152,6 +190,9 @@ func nestingFollowsIndentation(text: String, expected: [Int]) {
     ("- [x] mi‸lk", "- [ ] mi‸lk"),
     ("- [X] mi‸lk", "- [ ] mi‸lk"),
     ("\t- [ ] ‸", "\t- [x] ‸"),
+    // A numbered item becomes a task: tasks are never numbered.
+    ("1. mi‸lk", "- [ ] mi‸lk"),
+    ("\t12) ‸milk", "\t- [ ] ‸milk"),
 ])
 func commandLCyclesOneLine(input: String, expected: String) {
     #expect(run(.toggleTask, input) == expected)
@@ -181,6 +222,7 @@ func commandLCyclesOneLine(input: String, expected: String) {
     ("- mi‸lk", "mi‸lk"),
     ("\t- [x] mi‸lk", "\tmi‸lk"),
     ("- [ ] ‸", "‸"),
+    ("1. mi‸lk", "- mi‸lk"),
 ])
 func commandShift8TogglesABullet(input: String, expected: String) {
     #expect(run(.toggleBullet, input) == expected)
@@ -191,6 +233,34 @@ func commandShift8TogglesABullet(input: String, expected: String) {
     #expect(run(.toggleBullet, "⟨a\n\n- b\n\tc⟩") == "⟨- a\n\n- b\n\t- c⟩")
     // All items: their markers go, task markers included.
     #expect(run(.toggleBullet, "⟨- a\n\n\t- [ ] b⟩") == "⟨a\n\n\tb⟩")
+    // Numbered items aren't bullets: they become bullets.
+    #expect(run(.toggleBullet, "⟨- a\n1. b\n\t2) c⟩") == "⟨- a\n- b\n\t- c⟩")
+}
+
+// MARK: - ⇧⌘7
+
+@Test(arguments: [
+    ("mi‸lk", "1. mi‸lk"),
+    ("  mi‸lk", "  1. mi‸lk"),
+    ("‸", "1. ‸"),
+    ("3. mi‸lk", "mi‸lk"),
+    ("\t2) mi‸lk", "\tmi‸lk"),
+    ("- mi‸lk", "1. mi‸lk"),
+    ("- [x] mi‸lk", "1. mi‸lk"),
+    // Goes on from a numbered item just above at the same indentation, with its delimiter.
+    ("1. a\n2) b\nc‸", "1. a\n2) b\n3) c‸"),
+    ("1. a\n\tb‸", "1. a\n\t1. b‸"),
+    ("1. a\n\nb‸", "1. a\n\n1. b‸"),
+])
+func commandShift7TogglesANumber(input: String, expected: String) {
+    #expect(run(.toggleOrdered, input) == expected)
+}
+
+@Test func commandShift7AcrossLines() {
+    // Numbered from 1 at each indentation, blank lines skipped, every line renumbered.
+    #expect(run(.toggleOrdered, "⟨a\n\n- b\n\tc\n\t5. d\ne⟩") == "⟨1. a\n\n2. b\n\t1. c\n\t2. d\n3. e⟩")
+    // All numbered: their markers go.
+    #expect(run(.toggleOrdered, "⟨1. a\n\n\t2. b⟩") == "⟨a\n\n\tb⟩")
 }
 
 // MARK: - Tab and ⇧Tab
@@ -241,6 +311,39 @@ func shiftTabCutsIndentationBackToTheParents(input: String, expected: String) {
     #expect(run(.outdent, "- a‸") == nil)
     #expect(run(.outdent, "⟨- a\n- b⟩") == nil)
     #expect(run(.outdent, "te‸xt") == nil)
+}
+
+@Test func tabNestsANumberedItem() {
+    #expect(run(.indent, "1. a\n2. b‸") == "1. a\n\t2. b‸")
+    #expect(run(.outdent, "1. a\n\t2. b‸") == "1. a\n2. b‸")
+}
+
+// MARK: - Numbered siblings
+
+@Test func theSiblingsAfterAnItemAreTheOnesCountingOnFromIt() {
+    let text = "1. a\n2. b\n\t1. x\n\t- y\n3. c\n5. d\n6. e"
+    let ns = text as NSString
+    let items = MarkdownLists.items(in: text)
+    func siblings(_ index: Int) -> [String] {
+        MarkdownLists.numberedSiblings(after: items[index], in: items).map { ns.substring(with: $0.contentRange) }
+    }
+    // Children skipped; stops at the gap before 5.
+    #expect(siblings(0) == ["b", "c"])
+    #expect(siblings(2) == [])
+    #expect(siblings(5) == ["e"])
+    // Lazy numbering doesn't count up.
+    let lazy = MarkdownLists.items(in: "1. a\n1. b")
+    #expect(MarkdownLists.numberedSiblings(after: lazy[0], in: lazy).isEmpty)
+    // A bullet has none; a shallower item or another line ends the list.
+    let mixed = MarkdownLists.items(in: "- a\n2. b\n\t1. c\n2. d\n\n3. e")
+    #expect(MarkdownLists.numberedSiblings(after: mixed[0], in: mixed).isEmpty)
+    #expect(MarkdownLists.numberedSiblings(after: mixed[1], in: mixed).isEmpty)
+    #expect(MarkdownLists.numberedSiblings(after: mixed[2], in: mixed).isEmpty)
+}
+
+@Test func aNumberedItemHasNoCheckbox() throws {
+    let item = try #require(MarkdownLists.items(in: "1. a").first)
+    #expect(MarkdownLists.toggleCheckbox(item, in: "1. a", selection: NSRange(location: 0, length: 0)) == nil)
 }
 
 // MARK: - Checkbox click

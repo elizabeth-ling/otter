@@ -292,11 +292,14 @@ public struct HiddenMarkerEditing {
     /// a span's end the break goes after the closing marker. A selection is replaced first, by a
     /// plain line break.
     ///
-    /// In a list item with text, the new line starts with the same indentation and `- `, or
-    /// `- [ ] ` for a task (always unchecked), put before any markers opened again. With the caret
-    /// at the start of the text, or before or inside the marker, an empty item goes in above and
-    /// the item moves down, caret at the start of its text. In an empty item (only whitespace)
-    /// there's no line break: a nested item outdents, and a top-level one's line is emptied.
+    /// In a list item with text, the new line starts with the same indentation and `- `, `- [ ] `
+    /// for a task (always unchecked), or the next number for a numbered item, put before any
+    /// markers opened again. With the caret at the start of the text, or before or inside the
+    /// marker, an empty item goes in above and the item moves down, caret at the start of its
+    /// text; a numbered one's number goes to the new item and it takes the next. Either way the
+    /// numbered items after it at its level that count on from it go up by one
+    /// (`MarkdownLists.numberedSiblings`). In an empty item (only whitespace) there's no line
+    /// break: a nested item outdents, and a top-level one's line is emptied.
     public func lineBreak(at selection: NSRange) -> MarkdownEdit {
         let selection = clamped(selection)
         guard selection.length == 0 else {
@@ -314,13 +317,52 @@ public struct HiddenMarkerEditing {
             let line = NSRange(location: item.lineRange.location, length: NSMaxRange(item.contentRange) - item.lineRange.location)
             return MarkdownEdit(range: line, replacement: "", selection: NSRange(location: line.location, length: 0))
         }
-        let prefix = ns.substring(with: item.indentRange) + (item.isTask ? "- [ ] " : "- ")
+        let indentation = ns.substring(with: item.indentRange)
+        let renumbered = MarkdownLists.numberedSiblings(after: item, in: items).compactMap(Self.incremented)
         if caret <= item.contentRange.location {
-            let above = prefix + "\n"
-            let textStart = item.contentRange.location + (above as NSString).length
-            return MarkdownEdit(range: NSRange(location: item.lineRange.location, length: 0), replacement: above, selection: NSRange(location: textStart, length: 0))
+            var number = 1
+            var renumbered = renumbered
+            if case let .ordered(current, _) = item.kind, let own = Self.incremented(item) {
+                number = current
+                renumbered.insert(own, at: 0)
+            }
+            let above = indentation + MarkdownLists.continuationMarker(for: item, number: number) + "\n"
+            var textStart = item.contentRange.location + (above as NSString).length
+            if item.isOrdered, let own = renumbered.first {
+                textStart += (own.string as NSString).length - own.range.length
+            }
+            let insertion = MarkdownEdit(range: NSRange(location: item.lineRange.location, length: 0), replacement: above, selection: NSRange(location: textStart, length: 0))
+            return appending(renumbered, to: insertion)
         }
-        return lineBreakEdit(at: caret, terminator: "\n", prefix: prefix).edit
+        var number = 1
+        if case let .ordered(current, _) = item.kind {
+            number = current + 1
+        }
+        let prefix = indentation + MarkdownLists.continuationMarker(for: item, number: number)
+        return appending(renumbered, to: lineBreakEdit(at: caret, terminator: "\n", prefix: prefix).edit)
+    }
+
+    /// A numbered item's number one up, as a replacement of its digits.
+    private static func incremented(_ item: MarkdownListItem) -> (range: NSRange, string: String)? {
+        guard case let .ordered(number, _) = item.kind, let range = item.numberRange else {
+            return nil
+        }
+        return (range, String(number + 1))
+    }
+
+    /// `edit` grown to also make `replacements`, which come after it, in order and apart. Its
+    /// selection is before them, so it stays.
+    private func appending(_ replacements: [(range: NSRange, string: String)], to edit: MarkdownEdit) -> MarkdownEdit {
+        guard !replacements.isEmpty else {
+            return edit
+        }
+        var replacement = edit.replacement
+        var cursor = NSMaxRange(edit.range)
+        for piece in replacements {
+            replacement += ns.substring(with: NSRange(location: cursor, length: piece.range.location - cursor)) + piece.string
+            cursor = NSMaxRange(piece.range)
+        }
+        return MarkdownEdit(range: NSRange(location: edit.range.location, length: cursor - edit.range.location), replacement: replacement, selection: edit.selection)
     }
 
     /// After typing `inserted`: where the caret stays if the insertion completed a span's closing

@@ -609,6 +609,47 @@ func returnContinuesTheList(input: String, expected: String) {
 }
 
 @Test(arguments: [
+    ("1. ab‸c", "1. ab\n2. ‸c"),
+    ("\t3) abc‸", "\t3) abc\n\t4) ‸"),
+    ("9. abc‸", "9. abc\n10. ‸"),
+    ("1.\tab‸", "1.\tab\n2. ‸"),
+    ("1. **ab‸c**", "1. **ab**\n2. ‸**c**"),
+    // The items after it at its level that count on from it go up by one; children are skipped.
+    ("1. a‸\n2. b\n\t1. x\n3. c\n\nd", "1. a\n2. ‸\n3. b\n\t1. x\n4. c\n\nd"),
+    ("1. a\n\t1. x‸\n\t2. y\n2. b", "1. a\n\t1. x\n\t2. ‸\n\t3. y\n2. b"),
+    ("8. a‸\n9. b", "8. a\n9. ‸\n10. b"),
+    // Numbering that doesn't count up is left as typed from there.
+    ("1. a‸\n1. b", "1. a\n2. ‸\n1. b"),
+    ("1. a‸\n2. b\n7. c", "1. a\n2. ‸\n3. b\n7. c"),
+])
+func returnContinuesANumberedList(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test(arguments: [
+    // The new item above takes the number; the item and the ones after it go up.
+    ("1. ‸abc\n2. d", "1. \n2. ‸abc\n3. d"),
+    ("‸9. abc", "9. \n10. ‸abc"),
+    ("\t2) ‸abc", "\t2) \n\t3) ‸abc"),
+])
+func returnAtTheStartOfANumberedItemLeavesAnEmptyOneAbove(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test(arguments: [
+    ("1. a\n\t1. ‸", "1. a\n1. ‸"),
+    ("1. a\n2. ‸", "1. a\n‸"),
+])
+func returnOnAnEmptyNumberedItemOutdentsOrEndsTheList(input: String, expected: String) {
+    #expect(listBroken(input) == expected)
+}
+
+@Test func backspaceAtTheStartOfANumberedItemRemovesItsNumber() {
+    #expect(listDeleted("\t12. ‸a") == "\t‸a")
+    #expect(listDeleted("1. a‸\n2. b", backward: false) == "1. a‸b")
+}
+
+@Test(arguments: [
     ("- **ab‸c**", "- **ab**\n- ‸**c**"),
     ("- [ ] *a‸b*", "- [ ] *a*\n- [ ] ‸*b*"),
     ("- **abc‸**", "- **abc**\n- ‸"),

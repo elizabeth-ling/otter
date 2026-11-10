@@ -1,20 +1,23 @@
 import Foundation
 
-/// A `- ` bullet or a `- [ ]` / `- [x]` task: one line of the editor's text (ADR-017, UX_SPEC §1
-/// "Lists and tasks"). Ranges are UTF-16, as in `MarkdownSpan`.
+/// A `- ` bullet, a `- [ ]` / `- [x]` task or a `1. ` / `1) ` numbered item: one line of the
+/// editor's text (ADR-017, ADR-022, UX_SPEC §1 "Lists and tasks"). Ranges are UTF-16, as in
+/// `MarkdownSpan`.
 public struct MarkdownListItem: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         case bullet
         case task(checked: Bool)
+        /// `1. ` or `1) `: its number, as typed, and its `.` or `)`.
+        case ordered(number: Int, delimiter: Character)
     }
 
     /// The whole line, with its line break.
     public var lineRange: NSRange
-    /// The indentation, `- ` and, for a task, `[ ] `. Spaces after it belong to the text.
+    /// The indentation, `- ` (or `1. `) and, for a task, `[ ] `. Spaces after it belong to the text.
     public var prefixRange: NSRange
     /// From the start of the item's text to the end of the line, without the line break.
     public var contentRange: NSRange
-    /// The spaces and tabs before the `-`.
+    /// The spaces and tabs before the `-` or number.
     public var indentRange: NSRange
     /// The indentation's width: a space is one column, and a tab moves to the next multiple of 4
     /// (so a leading tab is 4 columns, as in CommonMark).
@@ -45,9 +48,25 @@ public struct MarkdownListItem: Hashable, Sendable {
         self.checkboxRange = checkboxRange
     }
 
-    /// The marker without the indentation: `- `, or `- [ ] ` for a task.
+    /// The marker without the indentation: `- `, `- [ ] ` for a task, or `1. ` for a numbered item.
     public var markerRange: NSRange {
         NSRange(location: NSMaxRange(indentRange), length: NSMaxRange(prefixRange) - NSMaxRange(indentRange))
+    }
+
+    /// A numbered item's digits, without the `.` or `)` and the space after it.
+    public var numberRange: NSRange? {
+        guard isOrdered else {
+            return nil
+        }
+        let marker = markerRange
+        return NSRange(location: marker.location, length: marker.length - 2)
+    }
+
+    public var isOrdered: Bool {
+        if case .ordered = kind {
+            return true
+        }
+        return false
     }
 
     public var isTask: Bool {
@@ -76,7 +95,7 @@ public struct MarkdownListItem: Hashable, Sendable {
 
     /// Whether `selection` shows the item's raw marker (ADR-018): a caret in its prefix, before
     /// the start of its text, or a selection with a character of the marker. A caret at the start
-    /// of the text, where typing goes, doesn't, so the bullet or box stays drawn there.
+    /// of the text, where typing goes, doesn't, so the bullet, box or number stays drawn there.
     public func revealsMarker(for selection: NSRange) -> Bool {
         if selection.length == 0 {
             return selection.location >= prefixRange.location && selection.location < NSMaxRange(prefixRange)
@@ -86,26 +105,30 @@ public struct MarkdownListItem: Hashable, Sendable {
     }
 }
 
-/// What `⌘L`, `⇧⌘8`, `Tab` and `⇧Tab` do to the list items in a selection (UX_SPEC §2).
+/// What `⌘L`, `⇧⌘8`, `⇧⌘7`, `Tab` and `⇧Tab` do to the list items in a selection (UX_SPEC §2).
 public enum ListCommand: Sendable {
     /// `⌘L`: make a task, or check or uncheck one.
     case toggleTask
     /// `⇧⌘8`: add or remove `- `.
     case toggleBullet
+    /// `⇧⌘7`: add or remove `1. `, `2. `…
+    case toggleOrdered
     /// `Tab`: nest under the item above.
     case indent
     /// `⇧Tab`: back to the parent's indentation.
     case outdent
 }
 
-/// Finds the `- ` bullets and `- [ ]` tasks the panel's editor shows as a list, and makes the
-/// edits its list keys ask for (ADR-017). It only reads the text; drawing and hiding are the
-/// editor's job, and the caret and line-break rules are `HiddenMarkerEditing`'s.
+/// Finds the `- ` bullets, `- [ ]` tasks and `1. ` numbered items the panel's editor shows as a
+/// list, and makes the edits its list keys ask for (ADR-017, ADR-022). It only reads the text;
+/// drawing and hiding are the editor's job, and the caret and line-break rules are
+/// `HiddenMarkerEditing`'s.
 ///
 /// Outside a fenced code block, a line is an item when it has optional indentation (spaces and
 /// tabs), then `-`, then one space or tab. `[ ] `, `[x] ` or `[X] ` straight after makes it a
-/// task (the space after `]` is needed, as in GFM). A rule (`---`, `- - -`) isn't an item, nor
-/// are `*`, `+` and numbered lists or lists in a quote.
+/// task (the space after `]` is needed, as in GFM). One to nine digits, then `.` or `)`, then one
+/// space or tab make a numbered item (CommonMark), which is never a task. A rule (`---`, `- - -`)
+/// isn't an item, nor are `*` and `+` lists or lists in a quote.
 ///
 /// Consecutive item lines form a list, and any other line ends it. An item's level is one more
 /// than the level of the nearest item above it in the same list with less indentation, or 0.
@@ -147,10 +170,14 @@ public enum MarkdownLists {
     ///
     /// - `toggleTask` (`⌘L`) works on the lines the selection touches, blank lines skipped
     ///   (unless it's only the caret's line): if any isn't a task, those become unchecked tasks
-    ///   (`- [ ] ` after the indentation, or `[ ] ` after a bullet's `- `); otherwise, if any task
-    ///   is unchecked, all are checked; otherwise all are unchecked.
-    /// - `toggleBullet` (`⇧⌘8`): if every line is an item, their markers come off (task markers
-    ///   too), keeping the indentation; otherwise each plain line gets `- ` after its indentation.
+    ///   (`- [ ] ` after the indentation, `[ ] ` after a bullet's `- `, or in place of a number);
+    ///   otherwise, if any task is unchecked, all are checked; otherwise all are unchecked.
+    /// - `toggleBullet` (`⇧⌘8`): if every line is a bullet or task, their markers come off (task
+    ///   markers too), keeping the indentation; otherwise each plain line gets `- ` after its
+    ///   indentation and each numbered item's number becomes `- `.
+    /// - `toggleOrdered` (`⇧⌘7`): if every line is a numbered item, their markers come off;
+    ///   otherwise every line is numbered, `1. ` up at each indentation (going on from a numbered
+    ///   item just above at the same indentation), in place of any marker.
     /// - `indent` (`Tab`) puts a tab before each item on the lines the selection touches. `nil`
     ///   unless the line above the first is an item at the same level or deeper.
     /// - `outdent` (`⇧Tab`) cuts each nested item's indentation back to its parent's. `nil` if
@@ -174,6 +201,12 @@ public enum MarkdownLists {
                 return nil
             }
             replacements = toggleBullet(lines.map { line in (line, items.first { $0.lineRange.location == line.start }) }, in: characters)
+        case .toggleOrdered:
+            guard let lines = targetLines(touching: selection, in: characters) else {
+                return nil
+            }
+            let above = lines.first.flatMap { first in items.last { NSMaxRange($0.lineRange) == first.start } }
+            replacements = toggleOrdered(lines.map { line in (line, items.first { $0.lineRange.location == line.start }) }, after: above, in: characters)
         case .indent:
             replacements = indent(items, touchedBy: selection)
         case .outdent:
@@ -183,12 +216,53 @@ public enum MarkdownLists {
     }
 
     /// Ticks or unticks a task's box (a click on it): `[x]` when checking, `[ ]` when unchecking,
-    /// `[X]` included. The selection stays as it is. `nil` for a bullet.
+    /// `[X]` included. The selection stays as it is. `nil` for a bullet or numbered item.
     public static func toggleCheckbox(_ item: MarkdownListItem, in text: String, selection: NSRange) -> MarkdownEdit? {
         guard let box = item.checkboxRange, NSMaxRange(box) <= (text as NSString).length else {
             return nil
         }
         return MarkdownEdit(range: box, replacement: item.isChecked ? "[ ]" : "[x]", selection: selection)
+    }
+
+    /// The marker `↩` starts a new item with after `item`: `- `, `- [ ] ` (always unchecked), or
+    /// `number` with `item`'s `.` or `)`.
+    public static func continuationMarker(for item: MarkdownListItem, number: Int) -> String {
+        switch item.kind {
+        case .bullet:
+            return "- "
+        case .task:
+            return "- [ ] "
+        case let .ordered(_, delimiter):
+            return "\(number)\(delimiter) "
+        }
+    }
+
+    /// The numbered items after `item` at its level in its list, while they count up by one from
+    /// its number (its children skipped): the ones a new item after it pushes down. A list
+    /// numbered some other way (`1.` on every line, or a gap) is left as typed from where it stops
+    /// counting up.
+    public static func numberedSiblings(after item: MarkdownListItem, in items: [MarkdownListItem]) -> [MarkdownListItem] {
+        guard case var .ordered(expected, _) = item.kind,
+              let index = items.firstIndex(where: { $0.lineRange.location == item.lineRange.location }) else {
+            return []
+        }
+        var siblings: [MarkdownListItem] = []
+        var previous = item
+        for next in items[(index + 1)...] {
+            guard NSMaxRange(previous.lineRange) == next.lineRange.location, next.level >= item.level else {
+                break
+            }
+            previous = next
+            if next.level > item.level {
+                continue
+            }
+            expected += 1
+            guard case let .ordered(number, _) = next.kind, number == expected else {
+                break
+            }
+            siblings.append(next)
+        }
+        return siblings
     }
 
     // MARK: - Parsing
@@ -208,34 +282,55 @@ public enum MarkdownLists {
             columns = characters[index] == tab ? columns + 4 - columns % 4 : columns + 1
             index += 1
         }
-        let dash = index
-        guard dash + 1 < line.end, characters[dash] == hyphen, isSpaceOrTab(characters[dash + 1]) else {
-            return nil
-        }
-        // A rule: three or more `-` and nothing else but spaces and tabs.
-        let rest = characters[dash..<line.end]
-        if rest.allSatisfy({ $0 == hyphen || isSpaceOrTab($0) }), rest.filter({ $0 == hyphen }).count >= 3 {
-            return nil
-        }
-        var contentStart = dash + 2
+        let markerStart = index
+        var contentStart: Int
         var kind = MarkdownListItem.Kind.bullet
         var checkbox: NSRange?
-        if contentStart + 3 < line.end, characters[contentStart] == openBracket, characters[contentStart + 2] == closeBracket,
-           [space, lowercaseX, uppercaseX].contains(characters[contentStart + 1]), isSpaceOrTab(characters[contentStart + 3]) {
-            kind = .task(checked: characters[contentStart + 1] != space)
-            checkbox = NSRange(location: contentStart, length: 3)
-            contentStart += 4
+        if markerStart + 1 < line.end, characters[markerStart] == hyphen, isSpaceOrTab(characters[markerStart + 1]) {
+            // A rule: three or more `-` and nothing else but spaces and tabs.
+            let rest = characters[markerStart..<line.end]
+            if rest.allSatisfy({ $0 == hyphen || isSpaceOrTab($0) }), rest.filter({ $0 == hyphen }).count >= 3 {
+                return nil
+            }
+            contentStart = markerStart + 2
+            if contentStart + 3 < line.end, characters[contentStart] == openBracket, characters[contentStart + 2] == closeBracket,
+               [space, lowercaseX, uppercaseX].contains(characters[contentStart + 1]), isSpaceOrTab(characters[contentStart + 3]) {
+                kind = .task(checked: characters[contentStart + 1] != space)
+                checkbox = NSRange(location: contentStart, length: 3)
+                contentStart += 4
+            }
+        } else if let ordered = orderedMarker(at: markerStart, before: line.end, in: characters) {
+            kind = .ordered(number: ordered.number, delimiter: ordered.delimiter)
+            contentStart = ordered.end
+        } else {
+            return nil
         }
         return MarkdownListItem(
             lineRange: NSRange(location: line.start, length: line.next - line.start),
             prefixRange: NSRange(location: line.start, length: contentStart - line.start),
             contentRange: NSRange(location: contentStart, length: line.end - contentStart),
-            indentRange: NSRange(location: line.start, length: dash - line.start),
+            indentRange: NSRange(location: line.start, length: markerStart - line.start),
             indentColumns: columns,
             level: 0,
             kind: kind,
             checkboxRange: checkbox
         )
+    }
+
+    /// `1. ` or `1) ` at `start`: one to nine digits, `.` or `)`, and a space or tab before `end`.
+    /// Its number, delimiter, and where its text starts.
+    private static func orderedMarker(at start: Int, before end: Int, in characters: [unichar]) -> (number: Int, delimiter: Character, end: Int)? {
+        var index = start
+        var number = 0
+        while index < end, index - start < 9, let digit = digitValue(characters[index]) {
+            number = number * 10 + digit
+            index += 1
+        }
+        guard index > start, index + 1 < end, characters[index] == period || characters[index] == closeParenthesis,
+              isSpaceOrTab(characters[index + 1]) else {
+            return nil
+        }
+        return (number, characters[index] == period ? "." : ")", index + 2)
     }
 
     // MARK: - Commands
@@ -270,6 +365,8 @@ public enum MarkdownLists {
                     return (NSRange(location: indentEnd(of: line, in: characters), length: 0), "- [ ] ")
                 case .bullet?:
                     return (NSRange(location: item!.contentRange.location, length: 0), "[ ] ")
+                case .ordered?:
+                    return (item!.markerRange, "- [ ] ")
                 case .task?:
                     return nil
                 }
@@ -285,11 +382,38 @@ public enum MarkdownLists {
     }
 
     private static func toggleBullet(_ lines: [TargetLine], in characters: [unichar]) -> [Replacement] {
-        if lines.allSatisfy({ $0.item != nil }) {
+        if lines.allSatisfy({ $0.item.map { !$0.isOrdered } ?? false }) {
             return lines.map { ($0.item!.markerRange, "") }
         }
         return lines.compactMap { line, item in
-            item == nil ? (NSRange(location: indentEnd(of: line, in: characters), length: 0), "- ") : nil
+            guard let item else {
+                return (NSRange(location: indentEnd(of: line, in: characters), length: 0), "- ")
+            }
+            return item.isOrdered ? (item.markerRange, "- ") : nil
+        }
+    }
+
+    private static func toggleOrdered(_ lines: [TargetLine], after above: MarkdownListItem?, in characters: [unichar]) -> [Replacement] {
+        if lines.allSatisfy({ $0.item?.isOrdered == true }) {
+            return lines.map { ($0.item!.markerRange, "") }
+        }
+        // The next number at each indentation, shallowest first.
+        var counters: [(columns: Int, next: Int, delimiter: Character)] = []
+        if let above, case let .ordered(number, delimiter) = above.kind {
+            counters.append((above.indentColumns, number + 1, delimiter))
+        }
+        return lines.map { line, item in
+            let columns = item?.indentColumns ?? indentColumns(of: line, in: characters)
+            while let last = counters.last, last.columns > columns {
+                counters.removeLast()
+            }
+            if counters.last?.columns != columns {
+                counters.append((columns, 1, "."))
+            }
+            let counter = counters[counters.count - 1]
+            counters[counters.count - 1].next += 1
+            let range = item?.markerRange ?? NSRange(location: indentEnd(of: line, in: characters), length: 0)
+            return (range, "\(counter.next)\(counter.delimiter) ")
         }
     }
 
@@ -324,6 +448,14 @@ public enum MarkdownLists {
             candidate -= 1
         }
         return nil
+    }
+
+    private static func indentColumns(of line: MarkdownLines.Line, in characters: [unichar]) -> Int {
+        var columns = 0
+        for index in line.start..<indentEnd(of: line, in: characters) {
+            columns = characters[index] == tab ? columns + 4 - columns % 4 : columns + 1
+        }
+        return columns
     }
 
     private static func indentEnd(of line: MarkdownLines.Line, in characters: [unichar]) -> Int {
@@ -382,9 +514,17 @@ private func isSpaceOrTab(_ unit: unichar) -> Bool {
     unit == space || unit == tab
 }
 
+private func digitValue(_ unit: unichar) -> Int? {
+    (zero...nine).contains(unit) ? Int(unit - zero) : nil
+}
+
 private let tab: unichar = 0x09
 private let space: unichar = 0x20
+private let closeParenthesis: unichar = 0x29
 private let hyphen: unichar = 0x2D
+private let period: unichar = 0x2E
+private let zero: unichar = 0x30
+private let nine: unichar = 0x39
 private let uppercaseX: unichar = 0x58
 private let openBracket: unichar = 0x5B
 private let closeBracket: unichar = 0x5D

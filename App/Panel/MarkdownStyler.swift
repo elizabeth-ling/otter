@@ -11,9 +11,10 @@ import os
 /// marker gets a near-zero font and a clear colour, which needs no layout-manager code and works
 /// the same on TextKit 1 and 2 (the spike found no visible gap, and caret and line heights unchanged).
 ///
-/// `- ` bullets and `- [ ]` tasks (ADR-017, ADR-018) are indented by level with a hanging indent.
-/// Their indentation is always hidden. While the selection is in an item's marker, the marker
-/// shows raw and dim; otherwise it's hidden too and `EditorTextView` draws a bullet or circle.
+/// `- ` bullets, `- [ ]` tasks and `1. ` numbered items (ADR-017, ADR-018, ADR-022) are indented
+/// by level with a hanging indent. Their indentation is always hidden. While the selection is in
+/// an item's marker, the marker shows raw and dim; otherwise it's hidden too and `EditorTextView`
+/// draws a bullet, circle or number in its place.
 /// Item paragraphs have no tab stops and a 0.001 pt tab interval, so hidden tabs take no space (the
 /// T18 spike: default stops push the text up to 80 pt; this lines up within 0.04 pt on TextKit 1
 /// and 2; an interval of 0 breaks TextKit 2's layout). A tab inside an item's text takes none either.
@@ -127,13 +128,15 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     }
 
     /// Where an item's text starts: 1.34 em past its level's start for a bullet, 1.75 em for a
-    /// task, measured from Obsidian (ADR-018).
-    func textStart(of item: MarkdownListItem) -> CGFloat {
-        textStart(level: item.level, isTask: item.isTask)
+    /// task, measured from Obsidian (ADR-018). A numbered item's is a bullet's, or further if its
+    /// marker (`10. `) is wider, so the drawn number never runs into the level before it (ADR-022).
+    func textStart(of item: MarkdownListItem, in text: NSString) -> CGFloat {
+        textStart(level: item.level, isTask: item.isTask, number: item.isOrdered ? text.substring(with: item.markerRange) : nil)
     }
 
-    private func textStart(level: Int, isTask: Bool) -> CGFloat {
-        levelStart(level: level) + (isTask ? Self.taskTextOffset : Self.bulletTextOffset) * font.pointSize
+    private func textStart(level: Int, isTask: Bool, number: String?) -> CGFloat {
+        let offset = (isTask ? Self.taskTextOffset : Self.bulletTextOffset) * font.pointSize
+        return levelStart(level: level) + max(offset, number.map { width(of: $0) } ?? 0)
     }
 
     private static let bulletTextOffset: CGFloat = 1.34
@@ -414,7 +417,8 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
             if item.isChecked {
                 mark(item.contentRange, .checked)
             }
-            list = ListStyle(level: item.level, isTask: item.isTask, revealedMarker: revealed ? ns.substring(with: item.markerRange) : nil)
+            let marker = ns.substring(with: item.markerRange)
+            list = ListStyle(level: item.level, isTask: item.isTask, number: item.isOrdered ? marker : nil, revealedMarker: revealed ? marker : nil)
         }
         var blockStyle: BlockStyle?
         switch block {
@@ -546,15 +550,15 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
     }
 
     /// An item's paragraph: wrapped lines hang at its text start. A revealed marker ends at the
-    /// text start if it fits after the level's start (`- `); otherwise (`- [ ] `) it starts there
-    /// and pushes the first line's text right, as in Obsidian.
+    /// text start if it fits after the level's start (`- `, `1. `); otherwise (`- [ ] `) it starts
+    /// there and pushes the first line's text right, as in Obsidian.
     private func paragraphStyle(for list: ListStyle) -> NSParagraphStyle {
         if let cached = paragraphStyles[list] {
             return cached
         }
         let style = Self.tablessParagraph.mutableCopy() as! NSMutableParagraphStyle
         style.lineSpacing = lineSpacingPoints
-        let textStart = textStart(level: list.level, isTask: list.isTask)
+        let textStart = textStart(level: list.level, isTask: list.isTask, number: list.number)
         style.headIndent = textStart
         let markerWidth = list.revealedMarker.map { width(of: $0) } ?? 0
         style.firstLineHeadIndent = max(textStart - markerWidth, levelStart(level: list.level))
@@ -794,10 +798,12 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
         case hiddenFence(isOpening: Bool)
     }
 
-    /// An item line's layout: its level and kind, and its raw marker if it's revealed.
+    /// An item line's layout: its level and kind, a numbered item's marker, and its raw marker if
+    /// it's revealed.
     private struct ListStyle: Hashable {
         let level: Int
         let isTask: Bool
+        let number: String?
         let revealedMarker: String?
     }
 
