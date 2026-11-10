@@ -31,3 +31,8 @@ The first release.
 - The default text size is now 14 instead of 15.
 - Better line spacing, and bullets line up with their text, in dark mode too.
 - The installer window is redesigned.
+
+## [1.0.0]
+
+- Numbered lists: type `1. ` to start one. 
+- The panel now stays open when you click elsewhere. Press the shortcut again to close it. To get the old behaviour back, toggle "Close panel when clicking elsewhere" in Settings. 
