@@ -283,7 +283,7 @@ The tabs sit in a centred preference-style toolbar, each an icon over its name; 
 **Advanced**
 - Outbox: pending count, last error, Retry now, Reveal outbox folder
 - Remember recent captures (on/off) · Clear recents
-- Updates: Automatically check for updates (on by default; "Once a day Otter asks GitHub whether there's a newer version. This is Otter's only network access, and it sends nothing but Otter's version number.") · Check Now
+- Updates: Version (e.g. "1.0.0 (42)", selectable) · Automatically check for updates (on by default; "Once a day Otter asks GitHub whether there's a newer version. This is Otter's only network access, and it sends nothing but Otter's version number.") · Check Now
 - Reveal logs (saves this run's log, which never holds note text, to `logs/` and shows it in Finder) · Reset all settings (after a confirmation: preferences, shortcuts, panel position, destinations and the update check go back to a fresh install's; waiting notes go to the Otter Inbox; onboarding isn't shown again)
 
 Every setting applies as it changes; there's no Save button. A destination with notes waiting can be deleted only after confirming they move to the default; the last destination can't be deleted. Health dots: green working, amber needs access, red folder missing; checked when the tab appears and after edits. A failed Test says what's wrong and offers the fix ("Choose Folder…" for a missing folder, "Grant Access…" to re-pick one Otter can't write to). `⌘W` closes the window.

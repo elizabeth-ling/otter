@@ -119,6 +119,14 @@ final class SettingsModel {
         updates.isAvailable
     }
 
+    /// "1.0.0 (42)": the marketing version and build number, which `scripts/release.sh` sets.
+    let appVersion: String = {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        guard let build = info?["CFBundleVersion"] as? String else { return version }
+        return "\(version) (\(build))"
+    }()
+
     init(pipeline: CapturePipeline, hotkeys: HotkeyService, folderChooser: FolderChooser, panel: PanelController, updates: UpdateController) {
         registry = pipeline.destinations
         outbox = pipeline.outbox

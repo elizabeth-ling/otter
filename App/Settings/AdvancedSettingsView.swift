@@ -47,6 +47,8 @@ struct AdvancedSettingsView: View {
             }
 
             Section("Updates") {
+                LabeledContent("Version", value: model.appVersion)
+                    .textSelection(.enabled)
                 Toggle(isOn: $model.automaticallyChecksForUpdates) {
                     Text("Automatically check for updates")
                     Text("Once a day Otter asks GitHub whether there's a newer version. This is Otter's only network access, and it sends nothing but Otter's version number.")
