@@ -35,4 +35,10 @@ The first release.
 ## [1.0.0]
 
 - Numbered lists: type `1. ` to start one. 
-- The panel now stays open when you click elsewhere. Press the shortcut again to close it. To get the old behaviour back, toggle "Close panel when clicking elsewhere" in Settings. 
+- The panel now stays open when you click elsewhere. Press the shortcut again to close it. To get the old behaviour back, toggle "Close panel when clicking elsewhere" in Settings.
+- New app icon 
+
+## [1.1.0]
+
+- Added version number to Settings > Advanced.
+
